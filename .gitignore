@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+backend/node_modules/
+
+# Env (KHÔNG được đẩy mật khẩu / secret lên GitHub)
+backend/.env
+.env
+.env.local
+
+# Build
+dist/
+build/
+frontend/dist/
+
+# Logs & OS
+*.log
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
