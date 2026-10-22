@@ -12,4 +12,5 @@ router.post("/login", authController.login);
 // GET /api/auth/me  (cần đăng nhập)
 router.get("/me", protect, authController.getMe);
 
+router.put("/profile", protect, authController.updateProfile);
 module.exports = router;

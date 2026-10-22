@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { CartItem, Page, AppUser, Order } from "../App";
+import { createOrder } from "../services/orderService";
 
 interface CheckoutPageProps {
   cart: CartItem[];
@@ -248,10 +249,10 @@ function OrderSummary({
 export default function CheckoutPage({ cart, navigate, user, onOrderPlaced }: CheckoutPageProps) {
   const [step, setStep] = useState<"address" | "payment" | "success">("address");
 
-  const [name, setName]       = useState(user?.name ?? "");
-  const [phone, setPhone]     = useState("");
-  const [address, setAddress] = useState("");
-  const [city, setCity]       = useState("TP.HCM");
+  const [name, setName] = useState(user?.name ?? "");
+  const [phone, setPhone] = useState(user?.phone ?? "");
+  const [address, setAddress] = useState(user?.address ?? "");
+  const [city, setCity] = useState(user?.city ?? "TP.HCM");
   const [note, setNote]       = useState("");
   const [payment, setPayment] = useState<"cod" | "transfer">("cod");
   const [errors, setErrors]   = useState<Record<string, string>>({});
@@ -261,6 +262,15 @@ export default function CheckoutPage({ cart, navigate, user, onOrderPlaced }: Ch
   const [promoInput, setPromoInput]       = useState("");
   const [appliedPromo, setAppliedPromo]   = useState<PromoCode | null>(null);
   const [promoError, setPromoError]       = useState("");
+
+  useEffect(() => {
+    if (user) {
+      setName(user.name || "");
+      setPhone(user.phone || "");
+      setAddress(user.address || "");
+      setCity(user.city || "TP.HCM");
+    }
+  }, [user]);
 
   const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
   const shipping = subtotal >= 500000 ? 0 : 30000;
@@ -296,30 +306,46 @@ export default function CheckoutPage({ cart, navigate, user, onOrderPlaced }: Ch
     return Object.keys(e).length === 0;
   };
 
-  const handlePlaceOrder = () => {
-    setPlacing(true);
-    setTimeout(() => {
-      const order: Order = {
-        id: `LM-2025-${String(Math.floor(Math.random() * 9000) + 1000)}`,
-        items: cart,
-        subtotal,
-        discount,
-        shipping,
-        total,
-        address,
-        city,
-        phone,
-        payment,
-        note,
-        createdAt: new Date().toISOString().split("T")[0],
-        status: "pending",
-      };
-      onOrderPlaced(order);
-      setPlacing(false);
-      setStep("success");
-    }, 1200);
-  };
+const handlePlaceOrder = async () => {
+  setPlacing(true);
+  try {
+    const data = await createOrder({
+      receiverName: name,
+      phone,
+      shippingAddress: address,
+      shippingCity: city,
+      paymentMethod: payment,
+      note,
+      // Backend hỗ trợ các field này trong orderService
+      // ts-expect-error mở rộng payload nếu type chưa khai báo
+      shippingFee: shipping,
+      discount,
+    } as any);
 
+    const order: Order = {
+      id: data.orderCode || data._id,
+      items: cart,
+      subtotal: data.subtotal,
+      discount: data.discount,
+      shipping: data.shippingFee,
+      total: data.total,
+      address: data.shippingAddress,
+      city: data.shippingCity,
+      phone: data.phone,
+      payment: data.paymentMethod,
+      note: data.note,
+      createdAt: data.createdAt?.slice(0, 10) || new Date().toISOString().slice(0, 10),
+      status: data.status,
+    };
+
+    onOrderPlaced(order);
+    setStep("success");
+  } catch (err: any) {
+    alert(err.message || "Đặt hàng thất bại. Kiểm tra giỏ hàng và đăng nhập.");
+  } finally {
+    setPlacing(false);
+  }
+};
   const inputStyle = {
     fontFamily: "var(--font-body)",
     border: "1px solid var(--color-champagne)",

@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 
 const userSchema = new mongoose.Schema(
@@ -41,6 +41,14 @@ const userSchema = new mongoose.Schema(
     isActive: {
       type: Boolean,
       default: true,
+    },
+    birthdate: { 
+      type: String, 
+      default: "" },
+    gender: {
+      type: String,
+      enum: ["female", "male", "other", ""],
+      default: "",
     },
   },
   {

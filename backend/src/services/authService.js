@@ -1,4 +1,4 @@
-const User = require("../models/User");
+﻿const User = require("../models/User");
 const jwt = require("jsonwebtoken");
 
 // Tạo JWT token
@@ -32,6 +32,11 @@ const register = async ({ name, email, password }) => {
       name: user.name,
       email: user.email,
       role: user.role,
+      phone: user.phone || "",
+      address: user.address || "",
+      city: user.city || "",
+      birthdate: user.birthdate || "",
+    gender: user.gender || "",
     },
     token,
   };
@@ -68,12 +73,48 @@ const login = async ({ email, password }) => {
       name: user.name,
       email: user.email,
       role: user.role,
+      phone: user.phone || "",
+      address: user.address || "",
+      city: user.city || "",
+      birthdate: user.birthdate || "",
+    gender: user.gender || "",
     },
     token,
+  };
+};
+
+const updateProfile = async (userId, data) => {
+  const user = await User.findById(userId);
+  if (!user) {
+    const error = new Error("Không tìm thấy người dùng");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (data.name !== undefined) user.name = data.name;
+  if (data.phone !== undefined) user.phone = data.phone;
+  if (data.address !== undefined) user.address = data.address;
+  if (data.city !== undefined) user.city = data.city;
+  if (data.birthdate !== undefined) user.birthdate = data.birthdate;
+  if (data.gender !== undefined) user.gender = data.gender;
+
+  await user.save();
+
+  return {
+    id: user._id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    phone: user.phone || "",
+    address: user.address || "",
+    city: user.city || "",
+    birthdate: user.birthdate || "",
+    gender: user.gender || "",
   };
 };
 
 module.exports = {
   register,
   login,
+  updateProfile,
 };

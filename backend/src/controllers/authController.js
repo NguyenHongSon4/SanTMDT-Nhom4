@@ -1,4 +1,4 @@
-const authService = require("../services/authService");
+﻿const authService = require("../services/authService");
 
 // Đăng ký
 const register = async (req, res) => {
@@ -67,6 +67,8 @@ const getMe = async (req, res) => {
         phone: req.user.phone,
         address: req.user.address,
         city: req.user.city,
+        birthdate: req.user.birthdate || "",
+        gender: req.user.gender || "",
       },
     });
   } catch (error) {
@@ -77,8 +79,25 @@ const getMe = async (req, res) => {
   }
 };
 
+const updateProfile = async (req, res) => {
+  try {
+    const user = await authService.updateProfile(req.user._id, req.body);
+    res.status(200).json({
+      success: true,
+      message: "Cập nhật hồ sơ thành công",
+      data: user,
+    });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || "Lỗi server",
+    });
+  }
+};
+
 module.exports = {
   register,
   login,
   getMe,
+  updateProfile,
 };

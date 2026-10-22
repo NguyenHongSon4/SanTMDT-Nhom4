@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import type { Page } from "../App";
-import { products } from "../data/products";
+import type { Page, Product } from "../App";
+import { fetchProducts } from "../services/productService";
 import ProductCard from "../components/ProductCard";
 
 interface HomePageProps {
@@ -38,8 +38,19 @@ export default function HomePage({ navigate }: HomePageProps) {
     return () => clearInterval(t);
   }, []);
 
-  const bestsellers = products.filter((p) => p.isBestseller);
-  const newArrivals = products.filter((p) => p.isNew);
+const [bestsellers, setBestsellers] = useState<Product[]>([]);
+const [newArrivals, setNewArrivals] = useState<Product[]>([]);
+
+useEffect(() => {
+  fetchProducts()
+    .then((list) => {
+      setBestsellers(list.filter((p) => p.isBestseller));
+      setNewArrivals(list.filter((p) => p.isNew));
+    })
+    .catch(() => {
+      // giữ mảng rỗng nếu lỗi
+    });
+}, []);
 
   return (
     <div style={{ paddingTop: "64px" }}>

@@ -34,6 +34,11 @@ export default function LoginPage({ navigate, onLogin }: LoginPageProps) {
         name: data.user.name,
         email: data.user.email,
         role: data.user.role,
+        phone: data.user.phone,
+        address: data.user.address,
+        city: data.user.city,
+        birthdate: data.user.birthdate,
+        gender: data.user.gender,
       });
       navigate(data.user.role === "admin" ? "admin-dashboard" : "home");
     } catch (err: any) {
@@ -67,6 +72,10 @@ export default function LoginPage({ navigate, onLogin }: LoginPageProps) {
           name: data.user.name,
           email: data.user.email,
           role: data.user.role,
+          phone: data.user.phone,
+          address: data.user.address,
+          city: data.user.city,
+          birthdate: data.user.birthdate,
         });
         navigate("home");
       }, 1000);

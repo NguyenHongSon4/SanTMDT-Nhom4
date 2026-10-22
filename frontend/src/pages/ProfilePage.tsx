@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { Page, AppUser } from "../App";
+import { updateProfile } from "../services/authService";
 
 interface ProfilePageProps {
   user: AppUser;
@@ -13,14 +14,26 @@ const cities = ["TP.HCM", "Hà Nội", "Đà Nẵng", "Cần Thơ", "Huế", "Nh
 export default function ProfilePage({ user, navigate, onLogout, onUpdateUser }: ProfilePageProps) {
   const [tab, setTab] = useState<"info" | "address" | "password">("info");
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   const [name, setName] = useState(user.name);
   const [phone, setPhone] = useState(user.phone ?? "");
-  const [birthdate, setBirthdate] = useState("");
-  const [gender, setGender] = useState("female");
+  const [birthdate, setBirthdate] = useState(user.birthdate ?? "");
+  const [gender, setGender] = useState(user.gender ?? "female");
 
   const [address, setAddress] = useState(user.address ?? "");
   const [city, setCity] = useState(user.city ?? "TP.HCM");
+
+  // Đồng bộ state local khi user prop được cập nhật từ bên ngoài
+  useEffect(() => {
+    setName(user.name);
+    setPhone(user.phone ?? "");
+    setBirthdate(user.birthdate ?? "");
+    setGender(user.gender ?? "female");
+    setAddress(user.address ?? "");
+    setCity(user.city ?? "TP.HCM");
+  }, [user]);
   const [ward, setWard] = useState("");
 
   const [curPwd, setCurPwd] = useState("");
@@ -29,17 +42,43 @@ export default function ProfilePage({ user, navigate, onLogout, onUpdateUser }: 
   const [pwdError, setPwdError] = useState("");
   const [pwdSuccess, setPwdSuccess] = useState(false);
 
-  const handleSaveInfo = () => {
-    onUpdateUser({ name, phone });
+  const handleSaveInfo = async () => {
+  setSaving(true);
+  setSaveError("");
+  try {
+    const data = await updateProfile({ name, phone, birthdate, gender });
+    onUpdateUser({
+      name: data.name,
+      phone: data.phone,
+      birthdate: data.birthdate,
+      gender: data.gender,
+    });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
-  };
+  } catch (err: any) {
+    setSaveError(err.message || "Cập nhật thất bại");
+  } finally {
+    setSaving(false);
+  }
+};
 
-  const handleSaveAddress = () => {
-    onUpdateUser({ address, city });
+  const handleSaveAddress = async () => {
+  setSaving(true);
+  setSaveError("");
+  try {
+    const data = await updateProfile({ address, city });
+    onUpdateUser({
+      address: data.address,
+      city: data.city,
+    });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
-  };
+  } catch (err: any) {
+    setSaveError(err.message || "Cập nhật thất bại");
+  } finally {
+    setSaving(false);
+  }
+};
 
   const handleSavePassword = () => {
     if (!curPwd) { setPwdError("Nhập mật khẩu hiện tại"); return; }

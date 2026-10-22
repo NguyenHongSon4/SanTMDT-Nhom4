@@ -16,6 +16,16 @@ import AdminCategories from "./pages/admin/AdminCategories";
 import AdminPromotions from "./pages/admin/AdminPromotions";
 import Navbar from "./components/Navbar";
 import { mockOrders } from "./data/mockData";
+import { useEffect } from "react";
+import {
+  getCart,
+  addToCartApi,
+  updateCartItemApi,
+  removeFromCartApi,
+} from "./services/cartService";
+import { getToken } from "./services/api";
+import { getMe } from "./services/authService";
+
 
 export type Page =
   | "home" | "products" | "detail" | "cart"
@@ -24,7 +34,7 @@ export type Page =
   | "admin-promotions";
 
 export interface CartItem {
-  id: number;
+  id: string;
   name: string;
   price: number;
   image: string;
@@ -33,7 +43,7 @@ export interface CartItem {
 }
 
 export interface Product {
-  id: number;
+  id: string;
   name: string;
   brand: string;
   price: number;
@@ -56,6 +66,8 @@ export interface AppUser {
   phone?: string;
   address?: string;
   city?: string;
+  birthdate?: string;
+  gender?: string;
 }
 
 export interface Order {
@@ -79,24 +91,35 @@ export default function App() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [user, setUser] = useState<AppUser | null>(null);
-  const [orders, setOrders] = useState<Order[]>(() =>
-    mockOrders
-      .filter((o) => o.userId === 1)
-      .map((o) => ({
-        id: o.id,
-        items: o.items,
-        subtotal: o.subtotal,
-        discount: o.discount,
-        shipping: o.shipping,
-        total: o.total,
-        address: o.address,
-        city: o.city,
-        phone: o.phone,
-        payment: o.payment,
-        createdAt: o.createdAt,
-        status: o.status,
-      }))
-  );
+  const [orders, setOrders] = useState<Order[]>([]);
+
+  // Khôi phục session khi reload trang
+  useEffect(() => {
+    getMe().then((u) => {
+      if (u) {
+        setUser({
+          name: u.name,
+          email: u.email,
+          role: u.role,
+          phone: u.phone,
+          address: u.address,
+          city: u.city,
+          birthdate: u.birthdate,
+          gender: u.gender,
+        });
+      }
+    });
+  }, []);
+  
+  useEffect(() => {
+    if (!user || !getToken()) {
+      setCart([]);
+      return;
+    }
+    getCart()
+      .then(setCart)
+      .catch(() => setCart([]));
+  }, [user]);
 
   const navigate = (target: Page, product?: Product) => {
     if (product) setSelectedProduct(product);
@@ -104,34 +127,44 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const addToCart = (product: Product, variant: string, qty: number) => {
-    setCart((prev) => {
-      const existing = prev.find((i) => i.id === product.id && i.variant === variant);
-      if (existing) {
-        return prev.map((i) =>
-          i.id === product.id && i.variant === variant ? { ...i, qty: i.qty + qty } : i
-        );
-      }
-      return [...prev, { id: product.id, name: product.name, price: product.price, image: product.image, qty, variant }];
-    });
-  };
+  const addToCart = async (product: Product, variant: string, qty: number) => {
+  if (!user || !getToken()) {
+    navigate("login");
+    return;
+  }
+  try {
+    const items = await addToCartApi(product.id, qty);
+    setCart(items);
+  } catch (err: any) {
+    alert(err.message || "Không thêm được vào giỏ");
+  }
+};
 
-  const updateCart = (id: number, variant: string, qty: number) => {
+const updateCart = async (id: string, variant: string, qty: number) => {
+  if (!user || !getToken()) return;
+  try {
     if (qty <= 0) {
-      setCart((prev) => prev.filter((i) => !(i.id === id && i.variant === variant)));
+      const items = await removeFromCartApi(id);
+      setCart(items);
     } else {
-      setCart((prev) => prev.map((i) => (i.id === id && i.variant === variant ? { ...i, qty } : i)));
+      const items = await updateCartItemApi(id, qty);
+      setCart(items);
     }
-  };
+  } catch (err: any) {
+    alert(err.message || "Không cập nhật được giỏ");
+  }
+};
 
   const handleLogin = (u: AppUser) => {
     setUser(u);
   };
 
-  const handleLogout = () => {
-    setUser(null);
-    setPage("home");
-  };
+ const handleLogout = () => {
+  // nếu có logout() từ authService thì gọi
+  setUser(null);
+  setCart([]);
+  setPage("home");
+};
 
   const handleUpdateUser = (updates: Partial<AppUser>) => {
     setUser((prev) => prev ? { ...prev, ...updates } : null);
@@ -145,6 +178,8 @@ export default function App() {
   const handleCancelOrder = (id: string) => {
     setOrders((prev) => prev.map((o) => o.id === id ? { ...o, status: "cancelled" } : o));
   };
+
+  
 
   const cartCount = cart.reduce((s, i) => s + i.qty, 0);
   const isAdminPage = page.startsWith("admin");
@@ -179,9 +214,7 @@ export default function App() {
           {page === "checkout" && (
             <CheckoutPage cart={cart} navigate={navigate} user={user} onOrderPlaced={handleOrderPlaced} />
           )}
-          {page === "orders" && (
-            <OrdersPage orders={orders} navigate={navigate} onCancelOrder={handleCancelOrder} />
-          )}
+          {page === "orders" && <OrdersPage navigate={navigate} />}
           {page === "profile" && user && (
             <ProfilePage user={user} navigate={navigate} onLogout={handleLogout} onUpdateUser={handleUpdateUser} />
           )}

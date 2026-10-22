@@ -3,7 +3,7 @@ import type { CartItem, Page } from "../App";
 
 interface CartPageProps {
   cart: CartItem[];
-  updateCart: (id: number, variant: string, qty: number) => void;
+  updateCart: (id: string, variant: string, qty: number) => void;
   navigate: (p: Page) => void;
 }
 
