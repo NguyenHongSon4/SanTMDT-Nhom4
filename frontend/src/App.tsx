@@ -185,7 +185,7 @@ const updateCart = async (id: string, variant: string, qty: number) => {
   const isAdminPage = page.startsWith("admin");
 
   const adminContent = (() => {
-    if (page === "admin-dashboard") return <AdminDashboard />;
+    if (page === "admin-dashboard") return <AdminDashboard navigate={navigate} />;
     if (page === "admin-products") return <AdminProducts />;
     if (page === "admin-orders") return <AdminOrders />;
     if (page === "admin-users") return <AdminUsers />;

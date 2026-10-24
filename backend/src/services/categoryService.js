@@ -1,4 +1,5 @@
 const Category = require("../models/Category");
+const Product = require("../models/Product");
 
 // Lấy tất cả danh mục
 const getAllCategories = async (query = {}) => {
@@ -73,7 +74,7 @@ const updateCategory = async (id, { name, description, isActive }) => {
   return category;
 };
 
-// Xóa danh mục (soft delete - chỉ vô hiệu hóa)
+// Xóa danh mục: có SP thì chặn; không có SP thì xóa hẳn
 const deleteCategory = async (id) => {
   const category = await Category.findById(id);
   if (!category) {
@@ -82,9 +83,23 @@ const deleteCategory = async (id) => {
     throw error;
   }
 
-  category.isActive = false;
-  await category.save();
-  return category;
+  // Đếm sản phẩm đang gắn category này
+  const productCount = await Product.countDocuments({
+  categoryId: id,
+  isActive: true,
+  });
+
+  if (productCount > 0) {
+    const error = new Error(
+      `Không thể xóa: còn ${productCount} sản phẩm thuộc danh mục này. Hãy chuyển hoặc xóa sản phẩm trước.`
+    );
+    error.statusCode = 400;
+    throw error;
+  }
+
+  // Không còn SP → xóa hẳn khỏi DB
+  await Category.findByIdAndDelete(id);
+  return { deleted: true, id };
 };
 
 module.exports = {
