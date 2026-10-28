@@ -13,7 +13,9 @@ const orderItemSchema = new mongoose.Schema(
     image: { type: String, default: "" },
   },
   { _id: false }
+  
 );
+
 
 const orderSchema = new mongoose.Schema(
   {
@@ -60,6 +62,12 @@ const orderSchema = new mongoose.Schema(
       enum: ["cod", "transfer"],
       default: "cod",
     },
+    paymentStatus: {
+  type: String,
+  enum: ["unpaid", "pending", "paid", "failed"],
+  default: "unpaid",
+  required: true,
+},
     subtotal: {
       type: Number,
       required: true,
