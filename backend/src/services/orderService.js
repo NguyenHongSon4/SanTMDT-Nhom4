@@ -19,7 +19,9 @@ const createOrder = async (userId, orderData) => {
     const error = new Error("Giỏ hàng trống, không thể đặt hàng");
     error.statusCode = 400;
     throw error;
+    
   }
+  
 
   // Kiểm tra tồn kho & sản phẩm còn bán
   for (const item of cart.items) {
