@@ -1,72 +1,145 @@
+const mongoose = require("mongoose");
 const Order = require("../models/Order");
 const Cart = require("../models/Cart");
 const Product = require("../models/Product");
 
-// Tạo mã đơn hàng duy nhất
-const generateOrderCode = () => {
-  const date = new Date();
-  const y = date.getFullYear().toString().slice(-2);
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  const random = Math.floor(1000 + Math.random() * 9000);
-  return `LM${y}${m}${d}${random}`;
+const SHIPPING_FEE_DEFAULT = 30000;
+const ORDER_STATUSES = [
+  "pending",
+  "confirmed",
+  "shipping",
+  "completed",
+  "cancelled",
+];
+
+const createError = (message, statusCode = 400) => {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
 };
 
-// Đặt hàng (từ giỏ hàng)
-const createOrder = async (userId, orderData) => {
-  const cart = await Cart.findOne({ userId }).populate("items.productId");
-  if (!cart || cart.items.length === 0) {
-    const error = new Error("Giỏ hàng trống, không thể đặt hàng");
-    error.statusCode = 400;
-    throw error;
+const assertValidObjectId = (id, label = "ID") => {
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    throw createError(`${label} không hợp lệ`, 400);
+  }
+};
+
+const parseNonNegativeNumber = (value, label, defaultValue) => {
+  if (value === undefined || value === null || value === "") {
+    return defaultValue;
   }
 
-  // Kiểm tra tồn kho & sản phẩm còn bán
-  for (const item of cart.items) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw createError(`${label} phải là số hợp lệ và không được âm`, 400);
+  }
+  return parsed;
+};
+
+// Tạo mã đơn hàng; kiểm tra trước để giảm khả năng trùng mã.
+const generateOrderCode = async () => {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const date = new Date();
+    const y = date.getFullYear().toString().slice(-2);
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    const random = Math.floor(10000 + Math.random() * 90000);
+    const code = `LM${y}${m}${d}${random}`;
+    const exists = await Order.exists({ orderCode: code });
+    if (!exists) return code;
+  }
+  throw createError("Không thể tạo mã đơn hàng, vui lòng thử lại", 503);
+};
+
+const rollbackStockChanges = async (changes) => {
+  for (const change of changes.reverse()) {
+    await Product.updateOne(
+      { _id: change.productId },
+      { $inc: { stock: change.quantity } }
+    );
+  }
+};
+
+// Đặt hàng từ giỏ hiện tại của khách hàng.
+const createOrder = async (userId, orderData = {}) => {
+  if (!userId) throw createError("Không xác định được người đặt hàng", 401);
+
+  const cart = await Cart.findOne({ userId }).populate("items.productId");
+  if (!cart || !cart.items || cart.items.length === 0) {
+    throw createError("Giỏ hàng trống, không thể đặt hàng", 400);
+  }
+
+  const items = cart.items.map((item) => {
     const product = item.productId;
     if (!product || !product.isActive) {
-      const error = new Error(`Sản phẩm không còn bán`);
-      error.statusCode = 400;
-      throw error;
+      throw createError("Có sản phẩm không còn được kinh doanh", 400);
+    }
+    if (!Number.isInteger(item.quantity) || item.quantity < 1) {
+      throw createError(`Số lượng của sản phẩm "${product.name}" không hợp lệ`, 400);
     }
     if (product.stock < item.quantity) {
-      const error = new Error(
-        `Sản phẩm "${product.name}" chỉ còn ${product.stock} sản phẩm`
+      throw createError(
+        `Sản phẩm "${product.name}" chỉ còn ${product.stock} sản phẩm`,
+        400
       );
-      error.statusCode = 400;
-      throw error;
     }
-  }
 
-  const items = cart.items.map((item) => ({
-    productId: item.productId._id,
-    name: item.productId.name,
-    price: item.productId.price,
-    quantity: item.quantity,
-    image:
-      item.productId.images && item.productId.images.length > 0
-        ? item.productId.images[0]
+    // Lấy giá và thông tin sản phẩm từ database, không lấy giá do client gửi lên.
+    return {
+      productId: product._id,
+      name: product.name,
+      price: product.price,
+      quantity: item.quantity,
+      image: Array.isArray(product.images) && product.images.length > 0
+        ? product.images[0]
         : "",
-  }));
+    };
+  });
 
   const subtotal = items.reduce(
     (sum, item) => sum + item.price * item.quantity,
     0
   );
-  const shippingFee = orderData.shippingFee ?? 30000;
-  const discount = orderData.discount ?? 0;
+  const shippingFee = parseNonNegativeNumber(
+    orderData.shippingFee,
+    "Phí vận chuyển",
+    SHIPPING_FEE_DEFAULT
+  );
+  const discount = parseNonNegativeNumber(orderData.discount, "Giảm giá", 0);
+
+  if (discount > subtotal) {
+    throw createError("Giảm giá không được lớn hơn tiền hàng", 400);
+  }
+
   const total = subtotal + shippingFee - discount;
+  if (!Number.isFinite(total) || total < 0) {
+    throw createError("Tổng tiền đơn hàng không hợp lệ", 400);
+  }
+
+  const requiredFields = [
+    ["receiverName", "Vui lòng nhập tên người nhận"],
+    ["phone", "Vui lòng nhập số điện thoại"],
+    ["shippingAddress", "Vui lòng nhập địa chỉ giao hàng"],
+    ["shippingCity", "Vui lòng nhập tỉnh/thành phố"],
+  ];
+  for (const [field, message] of requiredFields) {
+    if (typeof orderData[field] !== "string" || !orderData[field].trim()) {
+      throw createError(message, 400);
+    }
+  }
 
   const order = await Order.create({
-    orderCode: generateOrderCode(),
+    orderCode: await generateOrderCode(),
     userId,
     items,
-    receiverName: orderData.receiverName,
-    phone: orderData.phone,
-    shippingAddress: orderData.shippingAddress,
-    shippingWard: orderData.shippingWard || "",
-    shippingCity: orderData.shippingCity,
-    note: orderData.note || "",
+    receiverName: orderData.receiverName.trim(),
+    phone: orderData.phone.trim(),
+    shippingAddress: orderData.shippingAddress.trim(),
+    shippingWard: typeof orderData.shippingWard === "string"
+      ? orderData.shippingWard.trim()
+      : "",
+    shippingCity: orderData.shippingCity.trim(),
+    note: typeof orderData.note === "string" ? orderData.note.trim() : "",
     paymentMethod: orderData.paymentMethod || "cod",
     subtotal,
     shippingFee,
@@ -75,78 +148,75 @@ const createOrder = async (userId, orderData) => {
     status: "pending",
   });
 
-  // Xóa giỏ hàng sau khi đặt thành công
+  // Chỉ xóa giỏ hàng sau khi đơn hàng đã được lưu thành công.
   cart.items = [];
   await cart.save();
 
   return order;
 };
 
-// Khách xem lịch sử đơn hàng của mình
+// Khách xem lịch sử đơn hàng của mình.
 const getMyOrders = async (userId) => {
-  return await Order.find({ userId }).sort({ createdAt: -1 });
+  return Order.find({ userId }).sort({ createdAt: -1 });
 };
 
-// Khách xem chi tiết 1 đơn
+// Khách xem chi tiết đơn hàng của mình.
 const getMyOrderById = async (userId, orderId) => {
+  assertValidObjectId(orderId, "Mã đơn hàng");
   const order = await Order.findOne({ _id: orderId, userId });
-  if (!order) {
-    const error = new Error("Không tìm thấy đơn hàng");
-    error.statusCode = 404;
-    throw error;
-  }
+  if (!order) throw createError("Không tìm thấy đơn hàng", 404);
   return order;
 };
 
-// Khách hủy đơn (chỉ khi pending)
+// Khách chỉ được hủy đơn đang chờ xác nhận; cập nhật có điều kiện để tránh race condition.
 const cancelOrder = async (userId, orderId) => {
-  const order = await Order.findOne({ _id: orderId, userId });
-  if (!order) {
-    const error = new Error("Không tìm thấy đơn hàng");
-    error.statusCode = 404;
-    throw error;
-  }
+  assertValidObjectId(orderId, "Mã đơn hàng");
 
-  if (order.status !== "pending") {
-    const error = new Error("Chỉ có thể hủy đơn đang chờ xác nhận");
-    error.statusCode = 400;
-    throw error;
-  }
+  const order = await Order.findOneAndUpdate(
+    { _id: orderId, userId, status: "pending" },
+    { $set: { status: "cancelled" } },
+    { new: true, runValidators: true }
+  );
+  if (order) return order;
 
-  order.status = "cancelled";
-  await order.save();
-  return order;
+  const existingOrder = await Order.findOne({ _id: orderId, userId });
+  if (!existingOrder) throw createError("Không tìm thấy đơn hàng", 404);
+  throw createError("Chỉ có thể hủy đơn đang chờ xác nhận", 400);
 };
 
-// Admin xem tất cả đơn
+// Admin xem danh sách đơn hàng, có thể lọc theo trạng thái hiện có.
 const getAllOrders = async (query = {}) => {
   const filter = {};
-  if (query.status) filter.status = query.status;
-  return await Order.find(filter)
+  if (query.status) {
+    if (!ORDER_STATUSES.includes(query.status)) {
+      throw createError("Trạng thái đơn hàng không hợp lệ", 400);
+    }
+    filter.status = query.status;
+  }
+  return Order.find(filter)
     .populate("userId", "name email")
     .sort({ createdAt: -1 });
 };
 
-// Admin xem chi tiết đơn
+// Admin xem chi tiết đơn hàng.
 const getOrderById = async (orderId) => {
+  assertValidObjectId(orderId, "Mã đơn hàng");
   const order = await Order.findById(orderId).populate("userId", "name email");
-  if (!order) {
-    const error = new Error("Không tìm thấy đơn hàng");
-    error.statusCode = 404;
-    throw error;
-  }
+  if (!order) throw createError("Không tìm thấy đơn hàng", 404);
   return order;
 };
 
-// Admin cập nhật trạng thái đơn (BR42, BR56, BR60)
+// Admin cập nhật trạng thái theo luồng nghiệp vụ hiện có.
 const updateOrderStatus = async (orderId, newStatus) => {
-  const order = await Order.findById(orderId);
-  if (!order) {
-    const error = new Error("Không tìm thấy đơn hàng");
-    error.statusCode = 404;
-    throw error;
+  assertValidObjectId(orderId, "Mã đơn hàng");
+  if (!ORDER_STATUSES.includes(newStatus)) {
+    throw createError("Trạng thái đơn hàng không hợp lệ", 400);
   }
 
+  const order = await Order.findById(orderId);
+  if (!order) throw createError("Không tìm thấy đơn hàng", 404);
+
+  const currentStatus = order.status;
   const validTransitions = {
     pending: ["confirmed", "cancelled"],
     confirmed: ["shipping", "cancelled"],
@@ -155,44 +225,75 @@ const updateOrderStatus = async (orderId, newStatus) => {
     cancelled: [],
   };
 
-  if (!validTransitions[order.status]?.includes(newStatus)) {
-    const error = new Error(
-      `Không thể chuyển từ "${order.status}" sang "${newStatus}"`
+  if (!validTransitions[currentStatus]?.includes(newStatus)) {
+    throw createError(
+      `Không thể chuyển từ "${currentStatus}" sang "${newStatus}"`,
+      400
     );
-    error.statusCode = 400;
-    throw error;
   }
 
-  // BR42: Khi Admin xác nhận → trừ tồn kho
-  if (newStatus === "confirmed" && order.status === "pending") {
-    for (const item of order.items) {
-      const product = await Product.findById(item.productId);
-      if (!product) continue;
-      if (product.stock < item.quantity) {
-        const error = new Error(
-          `Sản phẩm "${item.name}" không đủ tồn kho để xác nhận`
+  // Khi xác nhận, trừ tồn kho bằng cập nhật có điều kiện để tránh bán vượt tồn.
+  // Nếu một mặt hàng không đủ tồn kho, hoàn lại các thay đổi đã thực hiện.
+  const deductedStock = [];
+  if (currentStatus === "pending" && newStatus === "confirmed") {
+    try {
+      for (const item of order.items) {
+        const updatedProduct = await Product.findOneAndUpdate(
+          { _id: item.productId, stock: { $gte: item.quantity } },
+          { $inc: { stock: -item.quantity } },
+          { new: true }
         );
-        error.statusCode = 400;
-        throw error;
+
+        if (!updatedProduct) {
+          throw createError(
+            `Sản phẩm "${item.name}" không đủ tồn kho để xác nhận`,
+            400
+          );
+        }
+        deductedStock.push({
+          productId: item.productId,
+          quantity: item.quantity,
+        });
       }
-      product.stock -= item.quantity;
-      await product.save();
+    } catch (error) {
+      await rollbackStockChanges(deductedStock);
+      throw error;
     }
   }
 
-  // BR60: Hủy đơn đã confirmed → hoàn tồn kho
-  if (newStatus === "cancelled" && order.status === "confirmed") {
-    for (const item of order.items) {
-      const product = await Product.findById(item.productId);
-      if (!product) continue;
-      product.stock += item.quantity;
-      await product.save();
+  // Chỉ đổi trạng thái nếu đơn vẫn ở trạng thái đã đọc ban đầu.
+  const updatedOrder = await Order.findOneAndUpdate(
+    { _id: orderId, status: currentStatus },
+    { $set: { status: newStatus } },
+    { new: true, runValidators: true }
+  );
+
+  if (!updatedOrder) {
+    if (deductedStock.length > 0) await rollbackStockChanges(deductedStock);
+    throw createError("Đơn hàng vừa được cập nhật bởi thao tác khác. Vui lòng tải lại", 409);
+  }
+
+  // Khi Admin hủy đơn đã xác nhận, hoàn tồn kho đúng một lần sau khi đổi trạng thái thành công.
+  if (currentStatus === "confirmed" && newStatus === "cancelled") {
+    try {
+      for (const item of order.items) {
+        await Product.updateOne(
+          { _id: item.productId },
+          { $inc: { stock: item.quantity } }
+        );
+      }
+    } catch (error) {
+      // Khôi phục trạng thái nếu thao tác hoàn tồn kho gặp lỗi.
+      await Order.findOneAndUpdate(
+        { _id: orderId, status: "cancelled" },
+        { $set: { status: "confirmed" } },
+        { runValidators: true }
+      );
+      throw createError("Không thể hoàn tồn kho. Vui lòng kiểm tra lại đơn hàng", 500);
     }
   }
 
-  order.status = newStatus;
-  await order.save();
-  return order;
+  return updatedOrder;
 };
 
 module.exports = {
