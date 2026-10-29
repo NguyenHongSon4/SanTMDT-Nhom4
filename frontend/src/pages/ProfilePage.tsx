@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import type { Page, AppUser } from "../App";
-import { updateProfile } from "../services/authService";
+import { updateProfile, changePassword } from "../services/authService";
 
 interface ProfilePageProps {
   user: AppUser;
@@ -41,6 +41,7 @@ export default function ProfilePage({ user, navigate, onLogout, onUpdateUser }: 
   const [confirmPwd, setConfirmPwd] = useState("");
   const [pwdError, setPwdError] = useState("");
   const [pwdSuccess, setPwdSuccess] = useState(false);
+  
 
   const handleSaveInfo = async () => {
   setSaving(true);
@@ -80,15 +81,41 @@ export default function ProfilePage({ user, navigate, onLogout, onUpdateUser }: 
   }
 };
 
-  const handleSavePassword = () => {
-    if (!curPwd) { setPwdError("Nhập mật khẩu hiện tại"); return; }
-    if (newPwd.length < 6) { setPwdError("Mật khẩu mới phải ≥ 6 ký tự"); return; }
-    if (newPwd !== confirmPwd) { setPwdError("Mật khẩu xác nhận không khớp"); return; }
-    setPwdError("");
+ const [pwdSaving, setPwdSaving] = useState(false);
+
+const handleSavePassword = async () => {
+  if (!curPwd) {
+    setPwdError("Nhập mật khẩu hiện tại");
+    return;
+  }
+  if (newPwd.length < 6) {
+    setPwdError("Mật khẩu mới phải ≥ 6 ký tự");
+    return;
+  }
+  if (newPwd !== confirmPwd) {
+    setPwdError("Mật khẩu xác nhận không khớp");
+    return;
+  }
+
+  setPwdError("");
+  setPwdSaving(true);
+  try {
+    await changePassword(curPwd, newPwd);
     setPwdSuccess(true);
-    setCurPwd(""); setNewPwd(""); setConfirmPwd("");
-    setTimeout(() => setPwdSuccess(false), 2500);
-  };
+    setCurPwd("");
+    setNewPwd("");
+    setConfirmPwd("");
+    // Hiện thông báo ngắn rồi đăng xuất
+    setTimeout(() => {
+      setPwdSuccess(false);
+      onLogout();
+    }, 1500);
+  } catch (err: any) {
+    setPwdError(err.message || "Đổi mật khẩu thất bại");
+  } finally {
+    setPwdSaving(false);
+  }
+};
 
   const inputStyle = {
     fontFamily: "var(--font-body)",
@@ -292,13 +319,19 @@ export default function ProfilePage({ user, navigate, onLogout, onUpdateUser }: 
                       </div>
                     ))}
                     {pwdError && <p style={{ color: "#c0392b", fontFamily: "var(--font-body)" }} className="text-xs">{pwdError}</p>}
-                    <button
-                      onClick={handleSavePassword}
-                      style={{ background: "var(--color-charcoal)", color: "var(--color-champagne)", fontFamily: "var(--font-body)" }}
-                      className="px-8 py-3 text-xs tracking-widest uppercase hover:opacity-80 transition-opacity"
-                    >
-                      Cập Nhật Mật Khẩu
-                    </button>
+                   <button
+                    type="button"
+                    onClick={handleSavePassword}
+                    disabled={pwdSaving}
+                    style={{
+                      background: "var(--color-charcoal)",
+                      color: "var(--color-champagne)",
+                      fontFamily: "var(--font-body)",
+                    }}
+                    className="px-8 py-3 text-xs tracking-widest uppercase hover:opacity-80 disabled:opacity-50"
+                  >
+                    {pwdSaving ? "Đang cập nhật..." : "Cập Nhật Mật Khẩu"}
+                  </button>
                   </div>
                 )}
               </div>

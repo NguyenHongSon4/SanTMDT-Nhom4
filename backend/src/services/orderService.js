@@ -1,6 +1,7 @@
 const Order = require("../models/Order");
 const Cart = require("../models/Cart");
 const Product = require("../models/Product");
+const Coupon = require("../models/Coupon");
 
 // Tạo mã đơn hàng duy nhất
 const generateOrderCode = () => {
@@ -49,13 +50,55 @@ const createOrder = async (userId, orderData) => {
         : "",
   }));
 
-  const subtotal = items.reduce(
+    const subtotal = items.reduce(
     (sum, item) => sum + item.price * item.quantity,
     0
   );
   const shippingFee = orderData.shippingFee ?? 30000;
-  const discount = orderData.discount ?? 0;
-  const total = subtotal + shippingFee - discount;
+
+  // Xử lý mã giảm giá phía server (không tin discount từ client)
+  let discount = 0;
+  let couponCode = "";
+  const rawCode = (orderData.couponCode || "").trim().toUpperCase();
+
+  if (rawCode) {
+    const coupon = await Coupon.findOne({ code: rawCode });
+    if (!coupon || !coupon.isActive) {
+      const error = new Error("Mã giảm giá không hợp lệ");
+      error.statusCode = 400;
+      throw error;
+    }
+    if (new Date(coupon.expiry) < new Date()) {
+      const error = new Error("Mã giảm giá đã hết hạn");
+      error.statusCode = 400;
+      throw error;
+    }
+    if (coupon.used >= coupon.usageLimit) {
+      const error = new Error("Mã giảm giá đã hết lượt sử dụng");
+      error.statusCode = 400;
+      throw error;
+    }
+    if (subtotal < (coupon.minOrder || 0)) {
+      const error = new Error(
+        `Đơn tối thiểu ${Number(coupon.minOrder).toLocaleString("vi-VN")}₫ để dùng mã này`
+      );
+      error.statusCode = 400;
+      throw error;
+    }
+
+    if (coupon.type === "percent") {
+      discount = Math.floor((subtotal * coupon.value) / 100);
+    } else {
+      discount = coupon.value;
+    }
+    if (discount > subtotal) discount = subtotal;
+
+    coupon.used += 1;
+    await coupon.save();
+    couponCode = coupon.code;
+  }
+
+  const total = Math.max(0, subtotal + shippingFee - discount);
 
   const order = await Order.create({
     orderCode: generateOrderCode(),
@@ -71,10 +114,10 @@ const createOrder = async (userId, orderData) => {
     subtotal,
     shippingFee,
     discount,
+    couponCode,
     total,
     status: "pending",
   });
-
   // Xóa giỏ hàng sau khi đặt thành công
   cart.items = [];
   await cart.save();

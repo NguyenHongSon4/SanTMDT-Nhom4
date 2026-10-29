@@ -73,3 +73,17 @@ export async function updateProfile(data: ProfileUpdate) {
   });
   return res.data;
 }
+
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string
+) {
+  const res = await apiRequest<{ success: boolean; message: string }>(
+    "/auth/password",
+    {
+      method: "PUT",
+      body: JSON.stringify({ currentPassword, newPassword }),
+    }
+  );
+  return res;
+}

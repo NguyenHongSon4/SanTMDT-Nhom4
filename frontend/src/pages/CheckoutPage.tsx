@@ -480,6 +480,7 @@ export default function CheckoutPage({
   const [payment, setPayment] = useState<"cod" | "transfer">("cod");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [placing, setPlacing] = useState(false);
+  const [lastOrder, setLastOrder] = useState<Order | null>(null);
 
   const [promoInput, setPromoInput] = useState("");
   const [appliedPromo, setAppliedPromo] = useState<AppliedPromo | null>(null);
@@ -583,6 +584,7 @@ export default function CheckoutPage({
       };
 
       onOrderPlaced(order);
+      setLastOrder(order);
       setStep("success");
     } catch (err: any) {
       alert(err.message || "Đặt hàng thất bại");
@@ -617,78 +619,183 @@ export default function CheckoutPage({
   };
 
   if (step === "success") {
-    return (
-      <div
-        style={{
-          paddingTop: "64px",
-          minHeight: "100vh",
-          background: "var(--color-cream)",
-        }}
-        className="flex items-center justify-center py-20 px-4"
-      >
-        <div className="text-center max-w-md">
-          <div
-            style={{
-              width: "72px",
-              height: "72px",
-              background: "var(--color-charcoal)",
-            }}
-            className="mx-auto flex items-center justify-center mb-6"
+  const paid = lastOrder?.total ?? total;
+  const orderCode = lastOrder?.id ?? "";
+  const orderDiscount = lastOrder?.discount ?? discount;
+  const orderSubtotal = lastOrder?.subtotal ?? subtotal;
+  const orderShipping = lastOrder?.shipping ?? shipping;
+  const orderPayment = lastOrder?.payment ?? payment;
+
+  return (
+    <div
+      style={{
+        paddingTop: "64px",
+        minHeight: "100vh",
+        background: "var(--color-cream)",
+      }}
+      className="flex items-center justify-center py-16 px-4"
+    >
+      <div className="text-center max-w-md w-full">
+        <div
+          style={{
+            width: "72px",
+            height: "72px",
+            background: "var(--color-charcoal)",
+          }}
+          className="mx-auto flex items-center justify-center mb-6"
+        >
+          <svg
+            width="32"
+            height="32"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="var(--color-champagne)"
+            strokeWidth="2"
           >
-            <svg
-              width="32"
-              height="32"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="var(--color-champagne)"
-              strokeWidth="2"
-            >
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-          </div>
-          <h1
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        </div>
+
+        <h1
+          style={{
+            fontFamily: "var(--font-display)",
+            color: "var(--color-charcoal)",
+          }}
+          className="text-3xl mb-2"
+        >
+          Đặt hàng thành công
+        </h1>
+        <p
+          style={{
+            color: "var(--color-warm-gray)",
+            fontFamily: "var(--font-body)",
+          }}
+          className="text-sm mb-2"
+        >
+          Cảm ơn bạn. Đơn hàng đang được xử lý.
+        </p>
+        {orderCode && (
+          <p
             style={{
-              fontFamily: "var(--font-display)",
               color: "var(--color-charcoal)",
+              fontFamily: "var(--font-body)",
             }}
-            className="text-3xl mb-3"
+            className="text-sm mb-6"
           >
-            Đặt hàng thành công
-          </h1>
+            Mã đơn:{" "}
+            <strong className="tracking-widest">{orderCode}</strong>
+          </p>
+        )}
+
+        {/* Chi tiết thanh toán */}
+        <div
+          style={{
+            background: "white",
+            border: "1px solid var(--color-champagne)",
+            textAlign: "left",
+          }}
+          className="p-5 mb-6"
+        >
+          <p
+            style={{
+              fontFamily: "var(--font-body)",
+              color: "var(--color-warm-gray)",
+            }}
+            className="text-xs tracking-widest uppercase mb-4"
+          >
+            Chi tiết thanh toán
+          </p>
+
+          <div className="space-y-2 mb-4">
+            <div className="flex justify-between text-sm">
+              <span style={{ color: "var(--color-warm-gray)" }}>Tạm tính</span>
+              <span style={{ color: "var(--color-charcoal)" }}>
+                {fmt(orderSubtotal)}
+              </span>
+            </div>
+            {orderDiscount > 0 && (
+              <div className="flex justify-between text-sm">
+                <span style={{ color: "var(--color-warm-gray)" }}>
+                  Giảm giá
+                </span>
+                <span style={{ color: "var(--color-gold)" }}>
+                  -{fmt(orderDiscount)}
+                </span>
+              </div>
+            )}
+            <div className="flex justify-between text-sm">
+              <span style={{ color: "var(--color-warm-gray)" }}>
+                Vận chuyển
+              </span>
+              <span style={{ color: "var(--color-charcoal)" }}>
+                {orderShipping === 0 ? "Miễn phí" : fmt(orderShipping)}
+              </span>
+            </div>
+          </div>
+
+          <div
+            style={{ borderTop: "1px solid var(--color-champagne)" }}
+            className="pt-3 flex justify-between items-baseline"
+          >
+            <span
+              style={{
+                fontFamily: "var(--font-body)",
+                color: "var(--color-charcoal)",
+              }}
+              className="text-xs tracking-widest uppercase font-medium"
+            >
+              Đã thanh toán
+            </span>
+            <span
+              style={{
+                fontFamily: "var(--font-display)",
+                color: "var(--color-charcoal)",
+              }}
+              className="text-2xl"
+            >
+              {fmt(paid)}
+            </span>
+          </div>
+
           <p
             style={{
               color: "var(--color-warm-gray)",
               fontFamily: "var(--font-body)",
             }}
-            className="text-sm mb-8"
+            className="text-xs mt-3"
           >
-            Cảm ơn bạn. Đơn hàng đang được xử lý.
+            Phương thức:{" "}
+            {orderPayment === "cod"
+              ? "Thanh toán khi nhận hàng (COD)"
+              : "Chuyển khoản ngân hàng"}
           </p>
-          <div className="flex flex-col gap-3">
-            <button
-              type="button"
-              onClick={() => navigate("orders")}
-              style={{
-                background: "var(--color-charcoal)",
-                color: "var(--color-champagne)",
-              }}
-              className="py-3 text-xs tracking-widest uppercase"
-            >
-              Xem đơn hàng
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate("home")}
-              style={{ border: "1px solid var(--color-champagne)" }}
-              className="py-3 text-xs tracking-widest uppercase"
-            >
-              Về trang chủ
-            </button>
-          </div>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <button
+            type="button"
+            onClick={() => navigate("orders")}
+            style={{
+              background: "var(--color-charcoal)",
+              color: "var(--color-champagne)",
+            }}
+            className="py-3 text-xs tracking-widest uppercase"
+          >
+            Xem đơn hàng
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate("home")}
+            style={{ border: "1px solid var(--color-champagne)" }}
+            className="py-3 text-xs tracking-widest uppercase"
+          >
+            Về trang chủ
+          </button>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
   if (cart.length === 0) {
   return (

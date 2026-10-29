@@ -24,7 +24,7 @@ import {
   removeFromCartApi,
 } from "./services/cartService";
 import { getToken } from "./services/api";
-import { getMe } from "./services/authService";
+import { getMe, logout } from "./services/authService";
 
 
 export type Page =
@@ -160,10 +160,10 @@ const updateCart = async (id: string, variant: string, qty: number) => {
   };
 
  const handleLogout = () => {
-  // nếu có logout() từ authService thì gọi
+  logout();
   setUser(null);
   setCart([]);
-  setPage("home");
+  setPage("login"); // hoặc "home" nếu muốn về trang chủ
 };
 
   const handleUpdateUser = (updates: Partial<AppUser>) => {

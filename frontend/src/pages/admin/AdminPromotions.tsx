@@ -15,6 +15,42 @@ const formatDate = (date: string) => {
   return new Date(`${date.slice(0, 10)}T00:00:00`).toLocaleDateString("vi-VN");
 };
 
+function couponStatus(p: CouponView): {
+  label: string;
+  color: string;
+  bg: string;
+} {
+  const expired = Boolean(p.expiry && new Date(p.expiry) < new Date());
+  const exhausted = p.usageLimit > 0 && p.used >= p.usageLimit;
+
+  if (!p.active) {
+    return {
+      label: "Tạm dừng",
+      color: "#c0392b",
+      bg: "rgba(192,57,43,0.08)",
+    };
+  }
+  if (expired) {
+    return {
+      label: "Hết hạn",
+      color: "#c0392b",
+      bg: "rgba(192,57,43,0.08)",
+    };
+  }
+  if (exhausted) {
+    return {
+      label: "Hết lượt",
+      color: "#b7791f",
+      bg: "rgba(201,168,130,0.2)",
+    };
+  }
+  return {
+    label: "Hoạt động",
+    color: "#5a8a6a",
+    bg: "rgba(90,138,106,0.12)",
+  };
+}
+
 interface FormState {
   id?: string;
   code: string;
@@ -72,15 +108,22 @@ export default function AdminPromotions() {
       !search ||
       p.code.toLowerCase().includes(search.toLowerCase()) ||
       p.description.toLowerCase().includes(search.toLowerCase());
+
+    const st = couponStatus(p);
     const matchesStatus =
       statusFilter === "all" ||
-      (statusFilter === "active" && p.active) ||
-      (statusFilter === "inactive" && !p.active);
+      (statusFilter === "active" && st.label === "Hoạt động") ||
+      (statusFilter === "inactive" && st.label === "Tạm dừng") ||
+      (statusFilter === "expired" && st.label === "Hết hạn") ||
+      (statusFilter === "exhausted" && st.label === "Hết lượt");
+
     return matchesSearch && matchesStatus;
   });
 
   const totalUsed = promotions.reduce((sum, p) => sum + p.used, 0);
-  const activeCount = promotions.filter((p) => p.active).length;
+  const activeCount = promotions.filter(
+    (p) => couponStatus(p).label === "Hoạt động"
+  ).length;
 
   const openNew = () => {
     setEditing(emptyForm());
@@ -272,12 +315,14 @@ export default function AdminPromotions() {
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          style={{ ...inputStyle, minWidth: "160px" }}
+          style={{ ...inputStyle, minWidth: "180px" }}
           className={inputClass}
         >
           <option value="all">Tất cả trạng thái</option>
-          <option value="active">Đang hoạt động</option>
-          <option value="inactive">Đã tạm dừng</option>
+          <option value="active">Hoạt động</option>
+          <option value="expired">Hết hạn</option>
+          <option value="exhausted">Hết lượt</option>
+          <option value="inactive">Tạm dừng</option>
         </select>
       </div>
 
@@ -329,6 +374,10 @@ export default function AdminPromotions() {
                   p.usageLimit > 0
                     ? Math.min(100, Math.round((p.used / p.usageLimit) * 100))
                     : 0;
+                const st = couponStatus(p);
+                const isExpired =
+                  Boolean(p.expiry) && new Date(p.expiry) < new Date();
+
                 return (
                   <tr
                     key={p.id}
@@ -374,7 +423,17 @@ export default function AdminPromotions() {
                     <td className="px-4 py-4">
                       <div className="min-w-28">
                         <div className="flex justify-between mb-1 text-xs">
-                          <span>{p.used}</span>
+                          <span
+                            style={{
+                              color:
+                                p.used > 0
+                                  ? "var(--color-charcoal)"
+                                  : "var(--color-warm-gray)",
+                              fontWeight: p.used > 0 ? 600 : 400,
+                            }}
+                          >
+                            {p.used}
+                          </span>
                           <span className="opacity-60">/ {p.usageLimit}</span>
                         </div>
                         <div
@@ -384,7 +443,10 @@ export default function AdminPromotions() {
                           <div
                             style={{
                               width: `${progress}%`,
-                              background: "var(--color-gold)",
+                              background:
+                                progress >= 100
+                                  ? "#c0392b"
+                                  : "var(--color-gold)",
                             }}
                             className="h-full"
                           />
@@ -392,23 +454,38 @@ export default function AdminPromotions() {
                       </div>
                     </td>
                     <td className="px-4 py-4 text-sm">
-                      {formatDate(p.expiry)}
-                    </td>
-                    <td className="px-4 py-4">
-                      <button
-                        type="button"
-                        onClick={() => toggleActive(p)}
+                      <span
                         style={{
-                          background: p.active
-                            ? "rgba(90,138,106,0.12)"
-                            : "rgba(192,57,43,0.08)",
-                          color: p.active ? "#5a8a6a" : "#c0392b",
+                          color: isExpired
+                            ? "#c0392b"
+                            : "var(--color-charcoal)",
                           fontFamily: "var(--font-body)",
                         }}
-                        className="text-xs px-2 py-1 uppercase"
                       >
-                        {p.active ? "Hoạt Động" : "Tạm Dừng"}
-                      </button>
+                        {formatDate(p.expiry)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="flex flex-col gap-1 items-start">
+                        <span
+                          style={{
+                            background: st.bg,
+                            color: st.color,
+                            fontFamily: "var(--font-body)",
+                          }}
+                          className="text-xs px-2 py-1 uppercase"
+                        >
+                          {st.label}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => toggleActive(p)}
+                          className="text-xs underline opacity-60 hover:opacity-100"
+                          style={{ fontFamily: "var(--font-body)" }}
+                        >
+                          {p.active ? "Tắt" : "Bật"}
+                        </button>
+                      </div>
                     </td>
                     <td className="px-4 py-4">
                       <div className="flex gap-2">
@@ -656,7 +733,7 @@ export default function AdminPromotions() {
                     )
                   }
                 />
-                Đang hoạt động
+                Đang bật (isActive)
               </label>
             </div>
             <div className="flex gap-3 mt-6">

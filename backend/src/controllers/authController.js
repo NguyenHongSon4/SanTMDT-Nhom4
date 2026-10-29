@@ -95,9 +95,25 @@ const updateProfile = async (req, res) => {
   }
 };
 
+const changePassword = async (req, res) => {
+  try {
+    await authService.changePassword(req.user._id, req.body);
+    res.status(200).json({
+      success: true,
+      message: "Đổi mật khẩu thành công",
+    });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || "Lỗi server",
+    });
+  }
+};
+
 module.exports = {
   register,
   login,
   getMe,
   updateProfile,
+  changePassword,
 };
