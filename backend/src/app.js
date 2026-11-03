@@ -9,12 +9,14 @@ const cartRoutes = require("./routes/cartRoutes");
 const orderRoutes = require("./routes/orderRoutes");
 const userRoutes = require("./routes/userRoutes");
 const couponRoutes = require("./routes/couponRoutes");
-
+const reviewRoutes = require("./routes/reviewRoutes");
+const path = require("path");
 const app = express();
 
 // Middleware cơ bản
 app.use(cors());
 app.use(express.json());
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 app.use(express.urlencoded({ extended: true }));
 
 // Route kiểm tra server
@@ -34,6 +36,7 @@ app.use("/api/cart", cartRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/coupons", couponRoutes);
+app.use("/api/reviews", reviewRoutes);
 
 // Xử lý route không tồn tại
 app.use((req, res) => {

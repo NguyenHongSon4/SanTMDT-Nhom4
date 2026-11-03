@@ -15,6 +15,7 @@ import AdminUsers from "./pages/admin/AdminUsers";
 import AdminCategories from "./pages/admin/AdminCategories";
 import AdminPromotions from "./pages/admin/AdminPromotions";
 import Navbar from "./components/Navbar";
+import AdminReviews from "./pages/admin/AdminReviews";
 import { mockOrders } from "./data/mockData";
 import { useEffect } from "react";
 import {
@@ -31,7 +32,7 @@ export type Page =
   | "home" | "products" | "detail" | "cart"
   | "login" | "checkout" | "orders" | "profile"
   | "admin-dashboard" | "admin-products" | "admin-orders" | "admin-users" | "admin-categories"
-  | "admin-promotions";
+  | "admin-promotions" | "admin-reviews";
 
 export interface CartItem {
   id: string;
@@ -191,6 +192,7 @@ const updateCart = async (id: string, variant: string, qty: number) => {
     if (page === "admin-users") return <AdminUsers />;
     if (page === "admin-categories") return <AdminCategories />;
     if (page === "admin-promotions") return <AdminPromotions />;
+    if (page === "admin-reviews") return <AdminReviews />;
     return null;
   })();
 

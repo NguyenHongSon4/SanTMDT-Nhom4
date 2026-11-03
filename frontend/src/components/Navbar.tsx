@@ -109,23 +109,103 @@ export default function Navbar({ page, navigate, cartCount, user, onLogout }: Na
                     <p style={{ color: "var(--color-warm-gray)", fontFamily: "var(--font-body)" }} className="text-xs font-light truncate">{user.email}</p>
                   </div>
                   {user.role === "admin" ? (
+                  (
                     [
-                      { label: "Dashboard", page: "admin-dashboard" as Page },
-                      { label: "Sản Phẩm", page: "admin-products" as Page },
-                      { label: "Danh Mục", page: "admin-categories" as Page },
-                      { label: "Đơn Hàng", page: "admin-orders" as Page },
-                      { label: "Người Dùng", page: "admin-users" as Page },
-                    ].map((item) => (
-                      <button
-                        key={item.page}
-                        onClick={() => { navigate(item.page); setUserMenuOpen(false); }}
-                        style={{ color: "var(--color-champagne)", fontFamily: "var(--font-body)", width: "100%", textAlign: "left" }}
-                        className="px-4 py-2.5 text-xs tracking-widest uppercase hover:bg-[rgba(232,221,208,0.08)] transition-colors block"
-                      >
-                        {item.label}
-                      </button>
-                    ))
-                  ) : (
+                      {
+                        label: "Tổng Quan",
+                        page: "admin-dashboard" as Page,
+                        icon: (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                            <rect x="3" y="3" width="7" height="7" />
+                            <rect x="14" y="3" width="7" height="7" />
+                            <rect x="14" y="14" width="7" height="7" />
+                            <rect x="3" y="14" width="7" height="7" />
+                          </svg>
+                        ),
+                      },
+                      {
+                        label: "Sản Phẩm",
+                        page: "admin-products" as Page,
+                        icon: (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                          </svg>
+                        ),
+                      },
+                      {
+                        label: "Đơn Hàng",
+                        page: "admin-orders" as Page,
+                        icon: (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                            <line x1="16" y1="13" x2="8" y2="13" />
+                            <line x1="16" y1="17" x2="8" y2="17" />
+                          </svg>
+                        ),
+                      },
+                      {
+                        label: "Người Dùng",
+                        page: "admin-users" as Page,
+                        icon: (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                            <circle cx="9" cy="7" r="4" />
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                          </svg>
+                        ),
+                      },
+                      {
+                        label: "Danh Mục",
+                        page: "admin-categories" as Page,
+                        icon: (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                          </svg>
+                        ),
+                      },
+                      {
+                        label: "Mã Giảm Giá",
+                        page: "admin-promotions" as Page,
+                        icon: (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                            <path d="M20.59 13.41 11 3.83V3H4v7h.83l9.58 9.59a2 2 0 0 0 2.82 0l3.36-3.36a2 2 0 0 0 0-2.82Z" />
+                            <circle cx="7.5" cy="6.5" r="1" />
+                          </svg>
+                        ),
+                      },
+                      {
+                        label: "Đánh Giá",
+                        page: "admin-reviews" as Page,
+                        icon: (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                          </svg>
+                        ),
+                      },
+                    ] as const
+                  ).map((item) => (
+                    <button
+                      key={item.page}
+                      type="button"
+                      onClick={() => {
+                        navigate(item.page);
+                        setUserMenuOpen(false);
+                      }}
+                      style={{
+                        color: page === item.page ? "var(--color-gold)" : "var(--color-champagne)",
+                        fontFamily: "var(--font-body)",
+                        width: "100%",
+                        textAlign: "left",
+                      }}
+                      className="px-4 py-2.5 text-xs tracking-widest uppercase hover:bg-[rgba(232,221,208,0.08)] transition-colors flex items-center gap-2.5"
+                    >
+                      <span style={{ opacity: 0.85, display: "inline-flex" }}>{item.icon}</span>
+                      {item.label}
+                    </button>
+                  ))
+                ) : (
                     [
                       { label: "Hồ Sơ", page: "profile" as Page },
                       { label: "Đơn Hàng", page: "orders" as Page },
