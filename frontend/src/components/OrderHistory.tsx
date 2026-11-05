@@ -9,7 +9,7 @@ interface OrderHistoryProps {
 const OrderHistory = ({ navigate }: OrderHistoryProps) => {
   const [activeTab, setActiveTab] = useState('ALL');
 
-  // Dữ liệu mẫu đơn hàng
+  // Quản lý danh sách đơn hàng bằng state
   const [orders, setOrders] = useState([
     {
       id: 'DH001',
@@ -58,7 +58,7 @@ const OrderHistory = ({ navigate }: OrderHistoryProps) => {
     }
   ]);
 
-  // Hàm xử lý hủy đơn hàng trực tiếp trên danh sách lịch sử
+  // LOGIC NÚT HỦY ĐƠN HÀNG
   const handleCancelOrder = (orderId: string) => {
     const confirmCancel = window.confirm(`Bạn có chắc chắn muốn hủy đơn hàng ${orderId} không?`);
     if (confirmCancel) {
@@ -70,7 +70,6 @@ const OrderHistory = ({ navigate }: OrderHistoryProps) => {
     }
   };
 
-  // Lọc danh sách theo tab trạng thái
   const filteredOrders = activeTab === 'ALL' 
     ? orders 
     : orders.filter(order => order.status === activeTab);
@@ -80,41 +79,14 @@ const OrderHistory = ({ navigate }: OrderHistoryProps) => {
       <div className="order-history-container">
         <h2 className="page-title">Lịch Sử Đơn Hàng</h2>
         
-        {/* Thanh chuyển đổi trạng thái (Tabs) */}
         <div className="order-tabs">
-          <button 
-            className={`tab-btn ${activeTab === 'ALL' ? 'active' : ''}`} 
-            onClick={() => setActiveTab('ALL')}
-          >
-            Tất cả
-          </button>
-          <button 
-            className={`tab-btn ${activeTab === 'Chờ xác nhận' ? 'active' : ''}`} 
-            onClick={() => setActiveTab('Chờ xác nhận')}
-          >
-            Chờ xác nhận
-          </button>
-          <button 
-            className={`tab-btn ${activeTab === 'Đang giao' ? 'active' : ''}`} 
-            onClick={() => setActiveTab('Đang giao')}
-          >
-            Đang giao
-          </button>
-          <button 
-            className={`tab-btn ${activeTab === 'Đã giao' ? 'active' : ''}`} 
-            onClick={() => setActiveTab('Đã giao')}
-          >
-            Đã giao
-          </button>
-          <button 
-            className={`tab-btn ${activeTab === 'Đã hủy' ? 'active' : ''}`} 
-            onClick={() => setActiveTab('Đã hủy')}
-          >
-            Đã hủy
-          </button>
+          <button className={`tab-btn ${activeTab === 'ALL' ? 'active' : ''}`} onClick={() => setActiveTab('ALL')}>Tất cả</button>
+          <button className={`tab-btn ${activeTab === 'Chờ xác nhận' ? 'active' : ''}`} onClick={() => setActiveTab('Chờ xác nhận')}>Chờ xác nhận</button>
+          <button className={`tab-btn ${activeTab === 'Đang giao' ? 'active' : ''}`} onClick={() => setActiveTab('Đang giao')}>Đang giao</button>
+          <button className={`tab-btn ${activeTab === 'Đã giao' ? 'active' : ''}`} onClick={() => setActiveTab('Đã giao')}>Đã giao</button>
+          <button className={`tab-btn ${activeTab === 'Đã hủy' ? 'active' : ''}`} onClick={() => setActiveTab('Đã hủy')}>Đã hủy</button>
         </div>
 
-        {/* Danh sách đơn hàng */}
         <div className="order-list">
           {filteredOrders.length === 0 ? (
             <div className="no-order-box">
@@ -123,7 +95,6 @@ const OrderHistory = ({ navigate }: OrderHistoryProps) => {
           ) : (
             filteredOrders.map(order => (
               <div className="order-card" key={order.id}>
-                {/* Header đơn hàng */}
                 <div className="order-header">
                   <div className="order-meta">
                     <span className="order-id">Mã đơn: <b>{order.id}</b></span>
@@ -139,7 +110,6 @@ const OrderHistory = ({ navigate }: OrderHistoryProps) => {
                   </span>
                 </div>
                 
-                {/* Body sản phẩm */}
                 <div className="order-body">
                   {order.items.map((item, index) => (
                     <div className="order-item" key={index}>
@@ -154,14 +124,13 @@ const OrderHistory = ({ navigate }: OrderHistoryProps) => {
                   ))}
                 </div>
 
-                {/* Footer & Nút hành động */}
                 <div className="order-footer">
                   <div className="total-container">
                     <span className="total-label">Thành tiền: </span>
                     <span className="total-value">{order.total}</span>
                   </div>
                   <div className="action-buttons">
-                    {/* Chỉ hiện nút Hủy đơn khi đơn hàng ở trạng thái Chờ xác nhận */}
+                    {/* NÚT HỦY ĐƠN HÀNG: Chỉ xuất hiện khi trạng thái là 'Chờ xác nhận' */}
                     {order.status === 'Chờ xác nhận' && (
                       <button 
                         className="btn btn-cancel-order" 
