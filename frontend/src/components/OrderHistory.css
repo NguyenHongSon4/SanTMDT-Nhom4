@@ -228,3 +228,159 @@
   border-radius: 8px;
   color: #777;
 }
+/* Màu sắc riêng cho trạng thái Chờ xác nhận */
+.status-pending {
+  color: #f57c00;
+  background-color: #fff3e0;
+}
+
+/* Kiểu dáng nút Hủy đơn hàng */
+.btn-cancel-order {
+  background-color: #fff;
+  border: 1px solid #d32f2f;
+  color: #d32f2f;
+}
+
+.btn-cancel-order:hover {
+  background-color: #ffebee;
+}
+/* Thanh tìm kiếm */
+.order-search-box {
+  margin-bottom: 15px;
+}
+
+.search-input {
+  width: 100%;
+  padding: 12px 15px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.search-input:focus {
+  border-color: #d84572;
+  box-shadow: 0 0 5px rgba(216, 69, 114, 0.2);
+}
+
+/* Giao diện Popup Modal Chi Tiết Đơn Hàng */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: 15px;
+}
+
+.modal-content {
+  background-color: #fff;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 550px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  background-color: #fcf8f9;
+  border-bottom: 1px solid #eee;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #333;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #888;
+}
+
+.close-btn:hover {
+  color: #333;
+}
+
+.modal-body {
+  padding: 20px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.info-section {
+  margin-bottom: 20px;
+}
+
+.info-section h4 {
+  font-size: 15px;
+  color: #d84572;
+  margin-bottom: 8px;
+  border-bottom: 1px dashed #eee;
+  padding-bottom: 5px;
+}
+
+.info-section p {
+  margin: 5px 0;
+  font-size: 13px;
+  color: #555;
+}
+
+.highlight-status {
+  font-weight: 600;
+  color: #d84572;
+}
+
+.modal-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  padding: 6px 0;
+  border-bottom: 1px solid #f9f9f9;
+}
+
+.modal-summary {
+  margin-top: 15px;
+  border-top: 1px solid #eee;
+  padding-top: 10px;
+  text-align: right;
+  font-size: 14px;
+}
+
+.modal-summary p {
+  margin: 4px 0;
+  color: #666;
+}
+
+.modal-total {
+  font-weight: 700;
+  font-size: 16px;
+  color: #d84572;
+}
+
+.modal-footer {
+  padding: 12px 20px;
+  background-color: #fafafa;
+  border-top: 1px solid #eee;
+  display: flex;
+  justify-content: flex-end;
+}

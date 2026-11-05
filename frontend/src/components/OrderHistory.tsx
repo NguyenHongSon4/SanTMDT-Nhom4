@@ -7,15 +7,14 @@ interface OrderHistoryProps {
 }
 
 const OrderHistory = ({ navigate }: OrderHistoryProps) => {
-  // Quản lý trạng thái tab đang được chọn (Mặc định là 'Tất cả')
   const [activeTab, setActiveTab] = useState('ALL');
 
-  // Dữ liệu mẫu (Mock data) mô phỏng các đơn hàng mỹ phẩm của người dùng
-  const orders = [
+  // Dữ liệu mẫu đơn hàng
+  const [orders, setOrders] = useState([
     {
       id: 'DH001',
       date: '03/11/2026',
-      status: 'Đang giao',
+      status: 'Chờ xác nhận',
       items: [
         { 
           name: 'Son dưỡng môi 3CE Blur Water Tint', 
@@ -23,16 +22,9 @@ const OrderHistory = ({ navigate }: OrderHistoryProps) => {
           quantity: 1, 
           price: '380.000đ', 
           image: 'https://images.unsplash.com/photo-1586495777744-4413f21062fa?auto=format&fit=crop&w=150&q=80' 
-        },
-        { 
-          name: 'Kem chống nắng Skin1004 Madagascar Centella', 
-          type: 'Dung tích 50ml', 
-          quantity: 1, 
-          price: '350.000đ', 
-          image: 'https://images.unsplash.com/photo-1556228720-195a672e8a03?auto=format&fit=crop&w=150&q=80' 
         }
       ],
-      total: '730.000đ'
+      total: '380.000đ'
     },
     {
       id: 'DH002',
@@ -64,9 +56,21 @@ const OrderHistory = ({ navigate }: OrderHistoryProps) => {
       ],
       total: '280.000đ'
     }
-  ];
+  ]);
 
-  // Lọc danh sách đơn hàng dựa theo tab trạng thái được click
+  // Hàm xử lý hủy đơn hàng trực tiếp trên danh sách lịch sử
+  const handleCancelOrder = (orderId: string) => {
+    const confirmCancel = window.confirm(`Bạn có chắc chắn muốn hủy đơn hàng ${orderId} không?`);
+    if (confirmCancel) {
+      setOrders(prevOrders =>
+        prevOrders.map(order =>
+          order.id === orderId ? { ...order, status: 'Đã hủy' } : order
+        )
+      );
+    }
+  };
+
+  // Lọc danh sách theo tab trạng thái
   const filteredOrders = activeTab === 'ALL' 
     ? orders 
     : orders.filter(order => order.status === activeTab);
@@ -110,7 +114,7 @@ const OrderHistory = ({ navigate }: OrderHistoryProps) => {
           </button>
         </div>
 
-        {/* Khu vực hiển thị danh sách đơn hàng */}
+        {/* Danh sách đơn hàng */}
         <div className="order-list">
           {filteredOrders.length === 0 ? (
             <div className="no-order-box">
@@ -119,18 +123,23 @@ const OrderHistory = ({ navigate }: OrderHistoryProps) => {
           ) : (
             filteredOrders.map(order => (
               <div className="order-card" key={order.id}>
-                {/* Phần đầu thẻ đơn hàng: Mã đơn, ngày mua, trạng thái */}
+                {/* Header đơn hàng */}
                 <div className="order-header">
                   <div className="order-meta">
                     <span className="order-id">Mã đơn: <b>{order.id}</b></span>
                     <span className="order-date">Ngày mua: {order.date}</span>
                   </div>
-                  <span className={`order-status status-${order.status === 'Đang giao' ? 'shipping' : order.status === 'Đã giao' ? 'success' : 'cancel'}`}>
+                  <span className={`order-status status-${
+                    order.status === 'Đang giao' ? 'shipping' 
+                    : order.status === 'Đã giao' ? 'success' 
+                    : order.status === 'Chờ xác nhận' ? 'pending' 
+                    : 'cancel'
+                  }`}>
                     {order.status}
                   </span>
                 </div>
                 
-                {/* Phần danh sách sản phẩm mỹ phẩm trong đơn */}
+                {/* Body sản phẩm */}
                 <div className="order-body">
                   {order.items.map((item, index) => (
                     <div className="order-item" key={index}>
@@ -145,13 +154,22 @@ const OrderHistory = ({ navigate }: OrderHistoryProps) => {
                   ))}
                 </div>
 
-                {/* Phần chân thẻ đơn hàng: Tổng tiền và các nút hành động */}
+                {/* Footer & Nút hành động */}
                 <div className="order-footer">
                   <div className="total-container">
                     <span className="total-label">Thành tiền: </span>
                     <span className="total-value">{order.total}</span>
                   </div>
                   <div className="action-buttons">
+                    {/* Chỉ hiện nút Hủy đơn khi đơn hàng ở trạng thái Chờ xác nhận */}
+                    {order.status === 'Chờ xác nhận' && (
+                      <button 
+                        className="btn btn-cancel-order" 
+                        onClick={() => handleCancelOrder(order.id)}
+                      >
+                        Hủy đơn hàng
+                      </button>
+                    )}
                     <button className="btn btn-detail" onClick={() => navigate("home")}>Xem chi tiết</button>
                     <button className="btn btn-buy-again" onClick={() => navigate("products")}>Mua lại</button>
                   </div>
