@@ -1,11 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import HomePage from "./pages/HomePage";
 import ProductsPage from "./pages/ProductsPage";
 import ProductDetailPage from "./pages/ProductDetailPage";
 import CartPage from "./pages/CartPage";
 import LoginPage from "./pages/LoginPage";
 import CheckoutPage from "./pages/CheckoutPage";
-import OrdersPage from "./pages/OrdersPage";
 import ProfilePage from "./pages/ProfilePage";
 import AdminLayout from "./pages/admin/AdminLayout";
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -16,8 +15,7 @@ import AdminCategories from "./pages/admin/AdminCategories";
 import AdminPromotions from "./pages/admin/AdminPromotions";
 import Navbar from "./components/Navbar";
 import AdminReviews from "./pages/admin/AdminReviews";
-import { mockOrders } from "./data/mockData";
-import { useEffect } from "react";
+import OrderHistory from "./components/OrderHistory";
 import {
   getCart,
   addToCartApi,
@@ -26,7 +24,6 @@ import {
 } from "./services/cartService";
 import { getToken } from "./services/api";
 import { getMe, logout } from "./services/authService";
-
 
 export type Page =
   | "home" | "products" | "detail" | "cart"
@@ -129,58 +126,56 @@ export default function App() {
   };
 
   const addToCart = async (product: Product, variant: string, qty: number) => {
-  if (!user || !getToken()) {
-    navigate("login");
-    return;
-  }
-  try {
-    const items = await addToCartApi(product.id, qty);
-    setCart(items);
-  } catch (err: any) {
-    alert(err.message || "Không thêm được vào giỏ");
-  }
-};
-
-const updateCart = async (id: string, variant: string, qty: number) => {
-  if (!user || !getToken()) return;
-  try {
-    if (qty <= 0) {
-      const items = await removeFromCartApi(id);
-      setCart(items);
-    } else {
-      const items = await updateCartItemApi(id, qty);
-      setCart(items);
+    if (!user || !getToken()) {
+      navigate("login");
+      return;
     }
-  } catch (err: any) {
-    alert(err.message || "Không cập nhật được giỏ");
-  }
-};
+    try {
+      const items = await addToCartApi(product.id, qty);
+      setCart(items);
+    } catch (err: any) {
+      alert(err.message || "Không thêm được vào giỏ");
+    }
+  };
+
+  const updateCart = async (id: string, variant: string, qty: number) => {
+    if (!user || !getToken()) return;
+    try {
+      if (qty <= 0) {
+        const items = await removeFromCartApi(id);
+        setCart(items);
+      } else {
+        const items = await updateCartItemApi(id, qty);
+        setCart(items);
+      }
+    } catch (err: any) {
+      alert(err.message || "Không cập nhật được giỏ");
+    }
+  };
 
   const handleLogin = (u: AppUser) => {
     setUser(u);
   };
 
- const handleLogout = () => {
-  logout();
-  setUser(null);
-  setCart([]);
-  setPage("login"); // hoặc "home" nếu muốn về trang chủ
-};
+  const handleLogout = () => {
+    logout();
+    setUser(null);
+    setCart([]);
+    setPage("login");
+  };
 
   const handleUpdateUser = (updates: Partial<AppUser>) => {
-    setUser((prev) => prev ? { ...prev, ...updates } : null);
+    setUser((prev: AppUser | null) => prev ? { ...prev, ...updates } : null);
   };
 
   const handleOrderPlaced = (order: Order) => {
-    setOrders((prev) => [order, ...prev]);
+    setOrders((prev: Order[]) => [order, ...prev]);
     setCart([]);
   };
 
   const handleCancelOrder = (id: string) => {
-    setOrders((prev) => prev.map((o) => o.id === id ? { ...o, status: "cancelled" } : o));
+    setOrders((prev: Order[]) => prev.map((o) => o.id === id ? { ...o, status: "cancelled" } : o));
   };
-
-  
 
   const cartCount = cart.reduce((s, i) => s + i.qty, 0);
   const isAdminPage = page.startsWith("admin");
@@ -216,7 +211,7 @@ const updateCart = async (id: string, variant: string, qty: number) => {
           {page === "checkout" && (
             <CheckoutPage cart={cart} navigate={navigate} user={user} onOrderPlaced={handleOrderPlaced} />
           )}
-          {page === "orders" && <OrdersPage navigate={navigate} />}
+          {page === "orders" && <OrderHistory navigate={navigate} />}
           {page === "profile" && user && (
             <ProfilePage user={user} navigate={navigate} onLogout={handleLogout} onUpdateUser={handleUpdateUser} />
           )}
