@@ -1,0 +1,168 @@
+.order-status-chart-page {
+  padding: 30px 20px;
+  background-color: #f4f6f8;
+  min-height: 85vh;
+}
+
+.chart-container {
+  max-width: 900px;
+  margin: 0 auto;
+  background: #fff;
+  padding: 30px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+  border-bottom: 2px solid #f0f0f0;
+  padding-bottom: 15px;
+}
+
+.page-title {
+  font-size: 22px;
+  color: #333;
+  margin: 0 0 5px 0;
+  font-weight: 700;
+}
+
+.page-subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: #666;
+}
+
+.time-select-box {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  outline: none;
+  background: #fff;
+  cursor: pointer;
+}
+
+.overview-banner {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 15px;
+  margin-bottom: 30px;
+}
+
+.overview-item {
+  background: #fafafa;
+  border: 1px solid #eaeaea;
+  padding: 18px;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.overview-label {
+  font-size: 12px;
+  color: #666;
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+.overview-value {
+  font-size: 20px;
+  font-weight: bold;
+  color: #333;
+  margin: 0;
+}
+
+.success-text {
+  color: #4caf50 !important;
+}
+
+.danger-text {
+  color: #f44336 !important;
+}
+
+.chart-content-box {
+  background: #fafafa;
+  border: 1px solid #eaeaea;
+  padding: 25px;
+  border-radius: 10px;
+  margin-bottom: 25px;
+}
+
+.chart-content-box h3 {
+  font-size: 16px;
+  color: #333;
+  margin-top: 0;
+  margin-bottom: 20px;
+  font-weight: 600;
+}
+
+.status-bar-row {
+  margin-bottom: 20px;
+}
+
+.status-bar-row:last-child {
+  margin-bottom: 0;
+}
+
+.row-info-top {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+
+.status-name {
+  font-weight: 600;
+  color: #333;
+  padding-left: 8px;
+  border-left: 4px solid #ccc;
+}
+
+.status-numbers {
+  color: #555;
+  font-size: 13px;
+}
+
+.bar-track {
+  background: #e0e0e0;
+  height: 12px;
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.4s ease;
+}
+
+.status-desc {
+  margin: 0;
+  font-size: 12px;
+  color: #777;
+  font-style: italic;
+}
+
+.chart-footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btn-back-manage {
+  padding: 10px 20px;
+  background: #d84572;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-back-manage:hover {
+  background: #be3760;
+}
