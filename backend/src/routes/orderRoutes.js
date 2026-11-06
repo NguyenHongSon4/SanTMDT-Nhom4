@@ -10,6 +10,7 @@ router.get("/my/:id", protect, orderController.getMyOrderById);
 router.put("/my/:id/cancel", protect, orderController.cancelOrder);
 
 // Admin
+router.get("/admin/statistics", protect, admin, orderController.getAdminStatistics);
 router.get("/", protect, admin, orderController.getAllOrders);
 router.get("/:id", protect, admin, orderController.getOrderById);
 router.put("/:id/status", protect, admin, orderController.updateOrderStatus);

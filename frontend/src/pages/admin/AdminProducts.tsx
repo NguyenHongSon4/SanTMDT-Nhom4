@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import {
   fetchAdminProducts,
   createProduct,
@@ -7,6 +7,7 @@ import {
   fetchCategories,
   type AdminProduct,
 } from "../../services/productService";
+import { fetchActiveBrands } from "../../services/brandService";
 
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "₫";
 
@@ -17,6 +18,7 @@ interface FormState {
   originalPrice: number | "";
   categoryId: string;
   stock: number | "";
+  brandId: string;
   description: string;
   ingredients: string;
   image: string;
@@ -29,6 +31,7 @@ const emptyForm = (): FormState => ({
   price: "",
   originalPrice: "",
   categoryId: "",
+  brandId: "",
   stock: 20,
   description: "",
   ingredients: "",
@@ -40,6 +43,7 @@ const emptyForm = (): FormState => ({
 export default function AdminProducts() {
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [brands, setBrands] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
@@ -57,12 +61,14 @@ export default function AdminProducts() {
     setLoading(true);
     setError("");
     try {
-      const [prods, cats] = await Promise.all([
+      const [prods, cats, brandList] = await Promise.all([
         fetchAdminProducts(),
         fetchCategories(),
+        fetchActiveBrands(),
       ]);
       setProducts(prods);
       setCategories(cats);
+      setBrands(brandList.map((b: { id: string; name: string }) => ({ id: b.id, name: b.name })));
     } catch (err: any) {
       setError(err.message || "Không tải được dữ liệu");
     } finally {
@@ -100,6 +106,7 @@ export default function AdminProducts() {
       price: p.price,
       originalPrice: p.originalPrice ?? "",
       categoryId: p.categoryId || categories[0]?.id || "",
+      brandId: p.brandId || "",
       stock: p.stock,
       description: p.description,
       ingredients: p.ingredients,
@@ -123,6 +130,7 @@ export default function AdminProducts() {
         originalPrice:
           form.originalPrice === "" ? null : Number(form.originalPrice),
         categoryId: form.categoryId,
+        brandId: form.brandId ? form.brandId : null,
         stock: form.stock === "" ? 0 : Number(form.stock),
         description: form.description,
         ingredients: form.ingredients,
@@ -625,6 +633,26 @@ export default function AdminProducts() {
                     {categories.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs tracking-widest uppercase mb-2">
+                    Thương hiệu
+                  </label>
+                  <select
+                    value={form.brandId || ""}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, brandId: e.target.value }))
+                    }
+                    style={inputStyle}
+                    className={inputCls}
+                  >
+                    <option value="">— Không chọn —</option>
+                    {brands.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
                       </option>
                     ))}
                   </select>

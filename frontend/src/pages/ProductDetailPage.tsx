@@ -21,6 +21,10 @@ export default function ProductDetailPage({ product, navigate, addToCart, user }
   const [tab, setTab] = useState<"desc" | "ingredients" | "guide">("desc");
   const [added, setAdded] = useState(false);
 
+  // Rating thực tế từ reviews API (cập nhật sau khi ReviewSection load xong)
+  const [liveRating, setLiveRating] = useState<number>(product.rating);
+  const [liveReviewCount, setLiveReviewCount] = useState<number>(product.reviews);
+
   const related = products.filter((p) => p.id !== product.id && p.category === product.category).slice(0, 3);
 
   const handleAdd = () => {
@@ -78,13 +82,13 @@ export default function ProductDetailPage({ product, navigate, addToCart, user }
             <div className="flex items-center gap-2 mb-6">
               <div className="flex gap-1">
                 {Array.from({ length: 5 }).map((_, i) => (
-                  <svg key={i} width="13" height="13" viewBox="0 0 24 24" fill={i < Math.floor(product.rating) ? "var(--color-gold)" : "none"} stroke="var(--color-gold)" strokeWidth="1.5">
+                  <svg key={i} width="13" height="13" viewBox="0 0 24 24" fill={i < Math.floor(liveRating) ? "var(--color-gold)" : "none"} stroke="var(--color-gold)" strokeWidth="1.5">
                     <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                   </svg>
                 ))}
               </div>
               <span style={{ color: "var(--color-warm-gray)", fontFamily: "var(--font-body)" }} className="text-xs">
-                {product.rating} ({product.reviews} đánh giá)
+                {liveRating > 0 ? liveRating.toFixed(1) : "0"} ({liveReviewCount} đánh giá)
               </span>
             </div>
 
@@ -245,6 +249,10 @@ export default function ProductDetailPage({ product, navigate, addToCart, user }
           totalReviews={product.reviews}
           user={user}
           navigate={navigate}
+          onStatsChange={(avg, count) => {
+            setLiveRating(avg);
+            setLiveReviewCount(count);
+          }}
         />
 
         {/* Related */}

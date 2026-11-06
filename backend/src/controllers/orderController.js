@@ -1,4 +1,28 @@
 const orderService = require("../services/orderService");
+const statisticsService = require("../services/statisticsService");
+
+// GET /api/orders/admin/statistics (Admin)
+const getAdminStatistics = async (req, res) => {
+  try {
+    const { from, to, interval } = req.query;
+    const isDate = (value) => {
+      if (!value) return true;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+      const parsed = new Date(`${value}T00:00:00.000Z`);
+      return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+    };
+    if (!isDate(from) || !isDate(to) || (from && to && from > to)) {
+      return res.status(400).json({ success: false, message: "Khoảng ngày thống kê không hợp lệ" });
+    }
+    if (interval && !["day", "month"].includes(interval)) {
+      return res.status(400).json({ success: false, message: "Nhóm thời gian không hợp lệ" });
+    }
+    const data = await statisticsService.getDashboardStatistics({ from, to, interval });
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({ success: false, message: error.message || "Lỗi server" });
+  }
+};
 
 // POST /api/orders  (Customer đặt hàng)
 const createOrder = async (req, res) => {
@@ -140,6 +164,7 @@ const updateOrderStatus = async (req, res) => {
 };
 
 module.exports = {
+  getAdminStatistics,
   createOrder,
   getMyOrders,
   getMyOrderById,
