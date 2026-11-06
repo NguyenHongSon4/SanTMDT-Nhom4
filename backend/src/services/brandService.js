@@ -1,4 +1,5 @@
 const Brand = require("../models/Brand");
+const Product = require("../models/Product");
 
 const getAllBrands = async (query = {}) => {
   const filter = {};
@@ -73,6 +74,18 @@ const deleteBrand = async (id) => {
   if (!brand) {
     const error = new Error("Không tìm thấy thương hiệu");
     error.statusCode = 404;
+    throw error;
+  }
+
+  const count = await Product.countDocuments({
+    brandId: id,
+    isActive: true,
+  });
+  if (count > 0) {
+    const error = new Error(
+      `Không thể vô hiệu: còn ${count} sản phẩm đang gắn thương hiệu này`
+    );
+    error.statusCode = 400;
     throw error;
   }
 

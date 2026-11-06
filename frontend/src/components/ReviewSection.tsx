@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import type { AppUser, Page } from "../App";
 import {
   fetchProductReviews,
@@ -12,6 +12,7 @@ interface ReviewSectionProps {
   totalReviews: number;
   user: AppUser | null;
   navigate: (p: Page) => void;
+  onStatsChange?: (avg: number, count: number) => void;
 }
 
 function StarSelector({
@@ -74,6 +75,7 @@ export default function ReviewSection({
   totalReviews,
   user,
   navigate,
+  onStatsChange,
 }: ReviewSectionProps) {
   const [reviews, setReviews] = useState<ReviewView[]>([]);
   const [loading, setLoading] = useState(true);
@@ -91,6 +93,8 @@ export default function ReviewSection({
     try {
       const data = await fetchProductReviews(productId);
       setReviews(data);
+      const avg = data.length > 0 ? data.reduce((s, r) => s + r.rating, 0) / data.length : 0;
+      onStatsChange?.(avg, data.length);
     } catch {
       setReviews([]);
     } finally {

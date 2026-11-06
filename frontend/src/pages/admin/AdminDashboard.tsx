@@ -1,21 +1,13 @@
 import { useState, useEffect, useMemo } from "react";
 import type { Page } from "../../App";
 import { statusLabel, statusColor } from "../../data/mockData";
-import {
-  getAllOrders,
-  type AdminOrderFromApi,
-} from "../../services/orderService";
-import {
-  fetchAdminProducts,
-  type AdminProduct,
-} from "../../services/productService";
+import { getDashboardStatistics, type DashboardStatistics } from "../../services/adminStatisticsService";
 
 const fmt = (n: number) =>
   n >= 1_000_000
     ? (n / 1_000_000).toFixed(1).replace(/\.0$/, "") + "M₫"
     : n.toLocaleString("vi-VN") + "₫";
 const fmtFull = (n: number) => n.toLocaleString("vi-VN") + "₫";
-const LOW_STOCK = 10;
 
 interface AdminDashboardProps {
   navigate: (p: Page) => void;
@@ -30,101 +22,26 @@ function toLocalYMD(d: Date) {
   return `${y}-${m}-${day}`;
 }
 
-function orderDayKey(iso: string) {
-  if (!iso) return "";
-  if (/^\d{4}-\d{2}-\d{2}/.test(iso)) return iso.slice(0, 10);
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return toLocalYMD(d);
-}
-
 function buildChart(
-  orders: AdminOrderFromApi[],
+  series: DashboardStatistics["revenueSeries"],
   mode: "7d" | "14d" | "6m" | "custom",
   fromDate: string,
   toDate: string
 ): ChartPoint[] {
-  const valid = orders.filter((o) => o.status !== "cancelled" && o.createdAt);
-
-  if (mode === "custom") {
-    if (!fromDate || !toDate || fromDate > toDate) return [];
-
-    const map = new Map<string, number>();
-    const from = new Date(fromDate + "T00:00:00");
-    const to = new Date(toDate + "T00:00:00");
-
-    for (let t = from.getTime(); t <= to.getTime(); t += 86400000) {
-      map.set(toLocalYMD(new Date(t)), 0);
-    }
-
-    for (const o of valid) {
-      const key = orderDayKey(o.createdAt);
-      if (key >= fromDate && key <= toDate) {
-        if (!map.has(key)) map.set(key, 0);
-        map.set(key, (map.get(key) || 0) + (o.total || 0));
-      }
-    }
-
-    const entries = Array.from(map.entries());
-    if (entries.length > 31) {
-      const byMonth = new Map<string, number>();
-      for (const [day, val] of entries) {
-        const m = day.slice(0, 7);
-        byMonth.set(m, (byMonth.get(m) || 0) + val);
-      }
-      return Array.from(byMonth.entries()).map(([k, value]) => ({
-        label: k.slice(5),
-        fullDate: k,
-        value,
-      }));
-    }
-
-    return entries.map(([k, value]) => ({
-      label: k.slice(8),
-      fullDate: k,
-      value,
-    }));
+  if (mode === "custom" && (!fromDate || !toDate || fromDate > toDate)) return [];
+  const monthly = mode === "6m" || (mode === "custom" && new Date(toDate).getTime() - new Date(fromDate).getTime() > 31 * 86400000);
+  const values = new Map(series.map((item) => [item.date, item.value]));
+  const keys: string[] = [];
+  if (monthly) {
+    const from = mode === "6m" ? new Date(new Date().getFullYear(), new Date().getMonth() - 5, 1) : new Date(`${fromDate}T00:00:00`);
+    const to = mode === "6m" ? new Date() : new Date(`${toDate}T00:00:00`);
+    for (let cursor = new Date(from.getFullYear(), from.getMonth(), 1); cursor <= to; cursor.setMonth(cursor.getMonth() + 1)) keys.push(`${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}`);
+  } else {
+    const end = mode === "custom" ? new Date(`${toDate}T00:00:00`) : new Date();
+    const start = mode === "custom" ? new Date(`${fromDate}T00:00:00`) : new Date(end.getFullYear(), end.getMonth(), end.getDate() - (mode === "7d" ? 6 : 13));
+    for (const cursor = new Date(start); cursor <= end; cursor.setDate(cursor.getDate() + 1)) keys.push(toLocalYMD(cursor));
   }
-
-  if (mode === "6m") {
-    const map = new Map<string, number>();
-    const now = new Date();
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      map.set(key, 0);
-    }
-    for (const o of valid) {
-      const key = orderDayKey(o.createdAt).slice(0, 7);
-      if (map.has(key)) {
-        map.set(key, (map.get(key) || 0) + (o.total || 0));
-      }
-    }
-    return Array.from(map.entries()).map(([k, value]) => ({
-      label: k.slice(5),
-      fullDate: k,
-      value,
-    }));
-  }
-
-  const days = mode === "7d" ? 7 : 14;
-  const map = new Map<string, number>();
-  const now = new Date();
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
-    map.set(toLocalYMD(d), 0);
-  }
-  for (const o of valid) {
-    const key = orderDayKey(o.createdAt);
-    if (map.has(key)) {
-      map.set(key, (map.get(key) || 0) + (o.total || 0));
-    }
-  }
-  return Array.from(map.entries()).map(([k, value]) => ({
-    label: k.slice(8),
-    fullDate: k,
-    value,
-  }));
+  return keys.map((key) => ({ label: monthly ? key.slice(5) : key.slice(8), fullDate: key, value: values.get(key) || 0 }));
 }
 
 function BarChart({ data }: { data: ChartPoint[] }) {
@@ -255,91 +172,39 @@ function BarChart({ data }: { data: ChartPoint[] }) {
 }
 
 export default function AdminDashboard({ navigate }: AdminDashboardProps) {
-  const [orders, setOrders] = useState<AdminOrderFromApi[]>([]);
-  const [products, setProducts] = useState<AdminProduct[]>([]);
+  const [stats, setStats] = useState<DashboardStatistics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [mode, setMode] = useState<"7d" | "14d" | "6m" | "custom">("6m");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
 
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      setError("");
-      try {
-        const [o, p] = await Promise.all([
-          getAllOrders(),
-          fetchAdminProducts(),
-        ]);
-        setOrders(o);
-        setProducts(p);
-      } catch (err: any) {
-        setError(err.message || "Không tải được dữ liệu dashboard");
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, []);
+  const range = useMemo(() => {
+    if (mode === "custom") {
+      const longRange = !!fromDate && !!toDate && new Date(toDate).getTime() - new Date(fromDate).getTime() > 31 * 86400000;
+      return { from: fromDate, to: toDate, interval: longRange ? "month" as const : "day" as const };
+    }
+    const end = new Date();
+    const start = mode === "6m" ? new Date(end.getFullYear(), end.getMonth() - 5, 1) : new Date(end.getFullYear(), end.getMonth(), end.getDate() - (mode === "7d" ? 6 : 13));
+    return { from: toLocalYMD(start), to: toLocalYMD(end), interval: mode === "6m" ? "month" as const : "day" as const };
+  }, [mode, fromDate, toDate]);
 
-  const stats = useMemo(() => {
-    const pending = orders.filter((o) => o.status === "pending").length;
-    const cancelled = orders.filter((o) => o.status === "cancelled").length;
-    const completed = orders.filter((o) => o.status === "completed");
-    const revenueAll = orders
-      .filter((o) => o.status !== "cancelled")
-      .reduce((s, o) => s + (o.total || 0), 0);
-    const revenueCompleted = completed.reduce(
-      (s, o) => s + (o.total || 0),
-      0
-    );
-    const cancelRate =
-      orders.length > 0
-        ? ((cancelled / orders.length) * 100).toFixed(1)
-        : "0";
-    const lowStock = products.filter((p) => p.stock < LOW_STOCK);
-    const byStatus = {
-      pending: orders.filter((o) => o.status === "pending").length,
-      confirmed: orders.filter((o) => o.status === "confirmed").length,
-      shipping: orders.filter((o) => o.status === "shipping").length,
-      completed: completed.length,
-      cancelled,
-    };
-    return {
-      pending,
-      cancelled,
-      revenueAll,
-      revenueCompleted,
-      cancelRate,
-      lowStock,
-      byStatus,
-      totalOrders: orders.length,
-      totalProducts: products.length,
-    };
-  }, [orders, products]);
+  useEffect(() => {
+    if (mode === "custom" && (!range.from || !range.to || range.from > range.to)) return;
+    let active = true;
+    setLoading(true);
+    setError("");
+    getDashboardStatistics(range)
+      .then((data) => { if (active) setStats(data); })
+      .catch((err: Error) => { if (active) setError(err.message || "Could not load dashboard statistics"); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [range, mode]);
 
   const chartData = useMemo(
-    () => buildChart(orders, mode, fromDate, toDate),
-    [orders, mode, fromDate, toDate]
+    () => stats ? buildChart(stats.revenueSeries, mode, range.from, range.to) : [],
+    [stats, mode, range]
   );
-
-  const recentOrders = useMemo(
-    () =>
-      [...orders]
-        .sort(
-          (a, b) =>
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        )
-        .slice(0, 5),
-    [orders]
-  );
-
-  const customerName = (o: AdminOrderFromApi) => {
-    if (typeof o.userId === "object" && o.userId?.name) return o.userId.name;
-    return o.receiverName || "—";
-  };
-
   if (loading) {
     return (
       <div className="p-6 lg:p-8">
@@ -359,6 +224,16 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
     );
   }
 
+  if (!stats || (mode === "custom" && (!range.from || !range.to || range.from > range.to))) {
+    return <div className="p-6 lg:p-8"><p className="opacity-60">Choose a valid date range to view statistics.</p></div>;
+  }
+
+  const pending = stats.byStatus.pending;
+  const cancelled = stats.byStatus.cancelled;
+  const lowStock = stats.lowStock;
+  const cancelRate = stats.totalOrders ? ((cancelled / stats.totalOrders) * 100).toFixed(1) : "0";
+  const customerName = (order: DashboardStatistics["recentOrders"][number]) =>
+    typeof order.userId === "object" && order.userId?.name ? order.userId.name : order.receiverName || "—";
   const statCards: {
     label: string;
     value: string;
@@ -366,27 +241,27 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
     go: Page;
   }[] = [
     {
-      label: "Doanh thu (chưa huỷ)",
-      value: fmt(stats.revenueAll),
-      sub: `Hoàn tất: ${fmt(stats.revenueCompleted)}`,
+      label: "Doanh thu ho\u00E0n t\u1EA5t (to\u00E0n th\u1EDDi gian)",
+      value: fmt(stats.revenueAllTime.total),
+      sub: `${stats.revenueAllTime.orders} \u0111\u01A1n \u0111\u00E3 ho\u00E0n t\u1EA5t`,
       go: "admin-orders",
     },
     {
       label: "Tổng đơn hàng",
       value: String(stats.totalOrders),
-      sub: `${stats.pending} chờ xác nhận`,
+      sub: `${pending} chờ xác nhận`,
       go: "admin-orders",
     },
     {
       label: "Sản phẩm",
       value: String(stats.totalProducts),
-      sub: `${stats.lowStock.length} sắp hết`,
+      sub: `${stats.lowStockCount} sắp hết`,
       go: "admin-products",
     },
     {
       label: "Tỉ lệ huỷ đơn",
-      value: `${stats.cancelRate}%`,
-      sub: `${stats.cancelled} đơn đã huỷ`,
+      value: `${cancelRate}%`,
+      sub: `${cancelled} cancelled orders`,
       go: "admin-orders",
     },
   ];
@@ -414,9 +289,9 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
         </h1>
       </div>
 
-      {(stats.pending > 0 || stats.lowStock.length > 0) && (
+      {(pending > 0 || stats.lowStockCount > 0) && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
-          {stats.pending > 0 && (
+          {pending > 0 && (
             <button
               type="button"
               onClick={() => navigate("admin-orders")}
@@ -435,11 +310,11 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
                 }}
                 className="text-xs"
               >
-                <strong>{stats.pending}</strong> đơn hàng đang chờ xác nhận
+                <strong>{pending}</strong> đơn hàng đang chờ xác nhận
               </p>
             </button>
           )}
-          {stats.lowStock.length > 0 && (
+          {stats.lowStockCount > 0 && (
             <button
               type="button"
               onClick={() => navigate("admin-products")}
@@ -458,8 +333,8 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
                 }}
                 className="text-xs"
               >
-                <strong>{stats.lowStock.length}</strong> sản phẩm tồn kho &lt;{" "}
-                {LOW_STOCK}
+                <strong>{stats.lowStockCount}</strong> sản phẩm tồn kho &lt;{" "}
+                {stats.lowStockThreshold}
               </p>
             </button>
           )}
@@ -541,7 +416,15 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
                 <button
                   key={k}
                   type="button"
-                  onClick={() => setMode(k)}
+              onClick={() => {
+                setMode(k);
+                if (k === "custom" && (!fromDate || !toDate)) {
+                  const end = new Date();
+                  const start = new Date(end.getFullYear(), end.getMonth(), end.getDate() - 29);
+                  setFromDate(toLocalYMD(start));
+                  setToDate(toLocalYMD(end));
+                }
+              }}
                   style={{
                     fontFamily: "var(--font-body)",
                     background:
@@ -601,6 +484,13 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
           )}
 
           <BarChart data={chartData} />
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-4 pt-4 border-t" style={{ borderColor: "var(--color-champagne)" }}>
+            <p className="text-xs">Doanh thu: <strong>{fmt(stats.revenuePeriod.total)}</strong></p>
+            <p className="text-xs">Số đơn: <strong>{stats.revenuePeriod.orders}</strong></p>
+            <p className="text-xs">Tiền hàng: <strong>{fmt(stats.revenuePeriod.subtotal)}</strong></p>
+            <p className="text-xs">Giảm giá: <strong>{fmt(stats.revenuePeriod.discount)}</strong></p>
+            <p className="text-xs">Phí giao hàng: <strong>{fmt(stats.revenuePeriod.shippingFee)}</strong></p>
+          </div>
         </div>
 
         <div
@@ -679,7 +569,7 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div
           style={{
             background: "white",
@@ -710,10 +600,10 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
             </button>
           </div>
           <div className="space-y-3">
-            {recentOrders.length === 0 && (
+            {stats.recentOrders.length === 0 && (
               <p className="text-sm opacity-50">Chưa có đơn hàng</p>
             )}
-            {recentOrders.map((order) => (
+            {stats.recentOrders.map((order) => (
               <button
                 key={order._id}
                 type="button"
@@ -786,7 +676,7 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
               }}
               className="text-lg font-normal"
             >
-              Tồn Kho Thấp (&lt; {LOW_STOCK})
+              Tồn Kho Thấp (&lt; {stats.lowStockThreshold})
             </h2>
             <button
               type="button"
@@ -801,11 +691,11 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
             </button>
           </div>
           <div className="space-y-4">
-            {stats.lowStock.length === 0 && (
+            {lowStock.length === 0 && (
               <p className="text-sm opacity-50">Không có SP sắp hết</p>
             )}
-            {stats.lowStock.slice(0, 8).map((item) => {
-              const pct = Math.min((item.stock / LOW_STOCK) * 100, 100);
+            {lowStock.slice(0, 8).map((item) => {
+              const pct = Math.min((item.stock / stats.lowStockThreshold) * 100, 100);
               return (
                 <button
                   key={item.id}
@@ -852,6 +742,18 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
                 </button>
               );
             })}
+          </div>
+        </div>
+        <div style={{ background: "white", border: "1px solid var(--color-champagne)" }} className="p-6">
+          <h2 style={{ fontFamily: "var(--font-display)", color: "var(--color-charcoal)" }} className="text-lg font-normal mb-5">Sản phẩm bán chạy</h2>
+          <div className="space-y-4">
+            {stats.topSelling.length === 0 && <p className="text-sm opacity-50">Chưa có đơn hoàn tất</p>}
+            {stats.topSelling.map((item, index) => (
+              <div key={item.productId || item.name} className="flex items-start justify-between gap-3 border-b pb-3" style={{ borderColor: "var(--color-champagne)" }}>
+                <div className="min-w-0"><p className="text-xs font-medium truncate">{index + 1}. {item.name}</p><p className="text-xs opacity-60">{item.quantity} sản phẩm</p></div>
+                <span className="text-xs whitespace-nowrap" title="Giá trị hàng trước giảm giá, chưa gồm phí giao hàng">{fmt(item.grossSales)}</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>

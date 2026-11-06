@@ -26,13 +26,26 @@ import {
 } from "./services/cartService";
 import { getToken } from "./services/api";
 import { getMe, logout } from "./services/authService";
+import AdminBrands from "./pages/admin/AdminBrands";
 
 
 export type Page =
-  | "home" | "products" | "detail" | "cart"
-  | "login" | "checkout" | "orders" | "profile"
-  | "admin-dashboard" | "admin-products" | "admin-orders" | "admin-users" | "admin-categories"
-  | "admin-promotions" | "admin-reviews";
+  | "home"
+  | "products"
+  | "detail"
+  | "cart"
+  | "login"
+  | "checkout"
+  | "orders"
+  | "profile"
+  | "admin-dashboard"
+  | "admin-products"
+  | "admin-orders"
+  | "admin-users"
+  | "admin-categories"
+  | "admin-promotions"
+  | "admin-reviews"
+  | "admin-brands";
 
 export interface CartItem {
   id: string;
@@ -193,6 +206,7 @@ const updateCart = async (id: string, variant: string, qty: number) => {
     if (page === "admin-categories") return <AdminCategories />;
     if (page === "admin-promotions") return <AdminPromotions />;
     if (page === "admin-reviews") return <AdminReviews />;
+    if (page === "admin-brands") return <AdminBrands />;
     return null;
   })();
 
