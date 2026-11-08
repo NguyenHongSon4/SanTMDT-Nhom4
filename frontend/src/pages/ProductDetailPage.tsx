@@ -13,10 +13,9 @@ interface Props {
 
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "₫";
 
-const variants = ["30ml", "50ml", "100ml"];
+const DEFAULT_VARIANT = "Mặc định";
 
 export default function ProductDetailPage({ product, navigate, addToCart, user }: Props) {
-  const [selectedVariant, setSelectedVariant] = useState(variants[1]);
   const [qty, setQty] = useState(1);
   const [tab, setTab] = useState<"desc" | "ingredients" | "guide">("desc");
   const [added, setAdded] = useState(false);
@@ -28,7 +27,7 @@ export default function ProductDetailPage({ product, navigate, addToCart, user }
   const related = products.filter((p) => p.id !== product.id && p.category === product.category).slice(0, 3);
 
   const handleAdd = () => {
-    addToCart(product, selectedVariant, qty);
+    addToCart(product, DEFAULT_VARIANT, qty);
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
   };
@@ -109,30 +108,6 @@ export default function ProductDetailPage({ product, navigate, addToCart, user }
               )}
             </div>
 
-            {/* Variant */}
-            <div className="mb-6">
-              <p style={{ color: "var(--color-charcoal)", fontFamily: "var(--font-body)" }} className="text-xs tracking-widest uppercase mb-3">
-                Dung Tích: <span style={{ color: "var(--color-gold)" }}>{selectedVariant}</span>
-              </p>
-              <div className="flex gap-2">
-                {variants.map((v) => (
-                  <button
-                    key={v}
-                    onClick={() => setSelectedVariant(v)}
-                    style={{
-                      fontFamily: "var(--font-body)",
-                      background: selectedVariant === v ? "var(--color-charcoal)" : "transparent",
-                      color: selectedVariant === v ? "var(--color-champagne)" : "var(--color-warm-gray)",
-                      border: selectedVariant === v ? "1px solid var(--color-charcoal)" : "1px solid var(--color-champagne)",
-                    }}
-                    className="px-5 py-2 text-xs tracking-widest uppercase transition-all hover:border-[var(--color-charcoal)]"
-                  >
-                    {v}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             {/* Qty + Add to cart */}
             <div className="flex gap-0 mb-6">
               <div style={{ border: "1px solid var(--color-champagne)" }} className="flex items-center">
@@ -170,7 +145,7 @@ export default function ProductDetailPage({ product, navigate, addToCart, user }
 
             {/* Buy now */}
             <button
-              onClick={() => { addToCart(product, selectedVariant, qty); navigate("cart"); }}
+              onClick={() => { addToCart(product, DEFAULT_VARIANT, qty); navigate("cart"); }}
               style={{ border: "1px solid var(--color-charcoal)", color: "var(--color-charcoal)", fontFamily: "var(--font-body)" }}
               className="w-full h-12 text-xs tracking-widest uppercase font-medium hover:bg-[var(--color-charcoal)] hover:text-[var(--color-champagne)] transition-colors mb-8"
             >

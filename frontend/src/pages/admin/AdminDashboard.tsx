@@ -261,7 +261,7 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
     {
       label: "Tỉ lệ huỷ đơn",
       value: `${cancelRate}%`,
-      sub: `${cancelled} cancelled orders`,
+      sub: `${cancelled} đơn đã hủy`,
       go: "admin-orders",
     },
   ];

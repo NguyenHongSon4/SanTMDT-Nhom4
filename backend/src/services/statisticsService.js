@@ -3,50 +3,53 @@ const Product = require("../models/Product");
 
 const STATUSES = ["pending", "confirmed", "shipping", "completed", "cancelled"];
 const LOW_STOCK = 10;
+const REVENUE_MATCH = {
+  status: "completed",
+  paymentStatus: { $ne: "refunded" },
+  $or: [{ paymentMethod: "cod" }, { paymentStatus: "paid" }],
+};
+
+const revenueDatePipeline = (from, to) => {
+  const pipeline = [
+    { $match: REVENUE_MATCH },
+    { $addFields: { revenueDate: { $ifNull: ["$completedAt", "$createdAt"] } } },
+  ];
+  if (from || to) {
+    const revenueDate = {};
+    if (from) revenueDate.$gte = new Date(`${from}T00:00:00+07:00`);
+    if (to) {
+      const end = new Date(`${to}T00:00:00+07:00`);
+      end.setUTCDate(end.getUTCDate() + 1);
+      revenueDate.$lt = end;
+    }
+    pipeline.push({ $match: { revenueDate } });
+  }
+  return pipeline;
+};
 
 const getDashboardStatistics = async ({ from, to, interval = "day" } = {}) => {
   const [statusRows, completedRevenue, periodRevenue, revenueSeries, topSelling, lowStock, lowStockCount, totalProducts, recentOrders] = await Promise.all([
     Order.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }]),
     Order.aggregate([
-      { $match: { status: "completed" } },
+      { $match: REVENUE_MATCH },
       { $group: { _id: null, total: { $sum: "$total" }, orders: { $sum: 1 } } },
     ]),
     (() => {
-      const match = { status: "completed" };
-      if (from || to) {
-        match.createdAt = {};
-        if (from) match.createdAt.$gte = new Date(`${from}T00:00:00+07:00`);
-        if (to) {
-          const end = new Date(`${to}T00:00:00+07:00`);
-          end.setUTCDate(end.getUTCDate() + 1);
-          match.createdAt.$lt = end;
-        }
-      }
       return Order.aggregate([
-        { $match: match },
+        ...revenueDatePipeline(from, to),
         { $group: { _id: null, total: { $sum: "$total" }, subtotal: { $sum: "$subtotal" }, discount: { $sum: "$discount" }, shippingFee: { $sum: "$shippingFee" }, orders: { $sum: 1 } } },
       ]);
     })(),
     (() => {
-      const match = { status: "completed" };
-      if (from || to) {
-        match.createdAt = {};
-        if (from) match.createdAt.$gte = new Date(`${from}T00:00:00+07:00`);
-        if (to) {
-          const end = new Date(`${to}T00:00:00+07:00`);
-          end.setUTCDate(end.getUTCDate() + 1);
-          match.createdAt.$lt = end;
-        }
-      }
       const dateFormat = interval === "month" ? "%Y-%m" : "%Y-%m-%d";
       return Order.aggregate([
-        { $match: match },
-        { $group: { _id: { $dateToString: { format: dateFormat, date: "$createdAt", timezone: "Asia/Ho_Chi_Minh" } }, value: { $sum: "$total" }, orders: { $sum: 1 } } },
+        ...revenueDatePipeline(from, to),
+        { $group: { _id: { $dateToString: { format: dateFormat, date: "$revenueDate", timezone: "Asia/Ho_Chi_Minh" } }, value: { $sum: "$total" }, orders: { $sum: 1 } } },
         { $sort: { _id: 1 } },
       ]);
     })(),
     Order.aggregate([
-      { $match: { status: "completed" } },
+      { $match: REVENUE_MATCH },
       { $unwind: "$items" },
       { $group: { _id: "$items.productId", name: { $max: "$items.name" }, quantity: { $sum: "$items.quantity" }, grossSales: { $sum: { $multiply: ["$items.price", "$items.quantity"] } } } },
       { $sort: { quantity: -1, name: 1 } },

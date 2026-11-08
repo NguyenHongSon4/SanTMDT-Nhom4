@@ -34,6 +34,10 @@ function mapOrder(o: OrderFromApi): Order {
     city: o.shippingCity,
     phone: o.phone,
     payment: o.paymentMethod,
+    paymentStatus: o.paymentStatus || (o.paymentMethod === "cod" ? "unpaid" : "pending"),
+    cancellationStatus: o.cancellationStatus || (o.status === "cancelled" ? "completed" : "none"),
+    cancellationReason: o.cancellationReason,
+    cancellationReasonDetail: o.cancellationReasonDetail,
     note: o.note,
     createdAt: o.createdAt ? o.createdAt.slice(0, 10) : "",
     status: o.status,
@@ -43,9 +47,35 @@ function mapOrder(o: OrderFromApi): Order {
 const paymentLabel: Record<string, string> = {
   cod: "COD",
   transfer: "Chuyển khoản",
+  card: "Thẻ qua VNPAY",
+};
+const paymentStatusLabel: Record<string, string> = {
+  paid: "Đã thanh toán",
+  pending: "Chờ thanh toán",
+  unpaid: "Chưa thanh toán",
+  failed: "Thanh toán thất bại",
+  refunded: "Đã hoàn tiền",
 };
 
 const steps = ["pending", "confirmed", "shipping", "completed"];
+const cancellationReasonLabels: Record<string, string> = {
+  ordered_by_mistake: "Tôi đặt nhầm / không còn nhu cầu",
+  change_items: "Tôi muốn thay đổi sản phẩm hoặc số lượng",
+  wrong_address: "Tôi nhập sai địa chỉ hoặc số điện thoại",
+  delivery_too_slow: "Thời gian giao hàng lâu hơn dự kiến",
+  found_better_price: "Tôi tìm được sản phẩm/giá phù hợp hơn",
+  changed_mind: "Tôi đổi ý",
+  other: "Lý do khác",
+};
+const cancellationReasons = [
+  ["ordered_by_mistake", "Tôi đặt nhầm / không còn nhu cầu"],
+  ["change_items", "Tôi muốn thay đổi sản phẩm hoặc số lượng"],
+  ["wrong_address", "Tôi nhập sai địa chỉ hoặc số điện thoại"],
+  ["delivery_too_slow", "Thời gian giao hàng lâu hơn dự kiến"],
+  ["found_better_price", "Tôi tìm được sản phẩm/giá phù hợp hơn"],
+  ["changed_mind", "Tôi đổi ý"],
+  ["other", "Lý do khác"],
+] as const;
 
 export default function OrdersPage({ navigate }: OrdersPageProps) {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -54,15 +84,28 @@ export default function OrdersPage({ navigate }: OrdersPageProps) {
   const [error, setError] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [cancelTarget, setCancelTarget] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelReasonDetail, setCancelReasonDetail] = useState("");
+  const [cancelError, setCancelError] = useState("");
+  const [notice, setNotice] = useState<{ type: "success" | "pending"; text: string } | null>(null);
   const [filterStatus, setFilterStatus] = useState("all");
   const [cancelling, setCancelling] = useState(false);
 
-  const loadOrders = async () => {
-    setLoading(true);
+  const loadOrders = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     setError("");
     try {
       const data = await getMyOrders();
       const mapped = data.map(mapOrder);
+      if (!showLoading) {
+        const completedCancellation = orders.find((previous) =>
+          previous.cancellationStatus === "requested" &&
+          mapped.some((current) => current.id === previous.id && current.cancellationStatus === "completed"),
+        );
+        if (completedCancellation) {
+          setNotice({ type: "success", text: `Yêu cầu hủy đơn ${completedCancellation.id} đã được Admin xử lý. Đơn hàng đã hủy thành công.` });
+        }
+      }
       const map: Record<string, string> = {};
       data.forEach((o) => {
         map[o.orderCode || o._id] = o._id;
@@ -73,13 +116,19 @@ export default function OrdersPage({ navigate }: OrdersPageProps) {
       setError(err.message || "Không tải được đơn hàng");
       setOrders([]);
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   };
 
   useEffect(() => {
     loadOrders();
   }, []);
+
+  useEffect(() => {
+    if (!orders.some((order) => order.cancellationStatus === "requested")) return;
+    const timer = window.setInterval(() => loadOrders(false), 10000);
+    return () => window.clearInterval(timer);
+  }, [orders]);
 
   const filtered =
     filterStatus === "all"
@@ -95,10 +144,24 @@ export default function OrdersPage({ navigate }: OrdersPageProps) {
       alert("Không tìm thấy đơn hàng");
       return;
     }
+    if (!cancelReason) {
+      setCancelError("Vui lòng chọn lý do hủy đơn.");
+      return;
+    }
+    if (cancelReason === "other" && !cancelReasonDetail.trim()) {
+      setCancelError("Vui lòng nhập lý do cụ thể.");
+      return;
+    }
+    setCancelError("");
     setCancelling(true);
     try {
-      await cancelMyOrder(mongoId);
+      const result = await cancelMyOrder(mongoId, cancelReason, cancelReasonDetail);
+      setNotice(result.cancellationStatus === "requested"
+        ? { type: "pending", text: `Yêu cầu hủy đơn ${displayId} đang chờ Admin xác nhận xử lý hoàn tiền.` }
+        : { type: "success", text: `Đơn hàng ${displayId} đã được hủy thành công.` });
       setCancelTarget(null);
+      setCancelReason("");
+      setCancelReasonDetail("");
       await loadOrders();
     } catch (err: any) {
       alert(err.message || "Hủy đơn thất bại");
@@ -134,6 +197,20 @@ export default function OrdersPage({ navigate }: OrdersPageProps) {
       </div>
 
       <div className="max-w-4xl mx-auto px-6 lg:px-12 py-10">
+        {notice && (
+          <div
+            role="status"
+            className="mb-6 border px-4 py-3 text-sm"
+            style={{
+              borderColor: notice.type === "success" ? "rgba(90,138,106,0.4)" : "var(--color-champagne)",
+              color: notice.type === "success" ? "#456b50" : "var(--color-charcoal)",
+              background: notice.type === "success" ? "rgba(90,138,106,0.08)" : "white",
+              fontFamily: "var(--font-body)",
+            }}
+          >
+            {notice.text}
+          </div>
+        )}
         <div
           style={{ borderBottom: "1px solid var(--color-champagne)" }}
           className="flex flex-wrap gap-0 mb-8"
@@ -264,6 +341,11 @@ export default function OrdersPage({ navigate }: OrdersPageProps) {
                       >
                         {statusLabel[order.status]}
                       </div>
+                      {order.cancellationStatus === "requested" && (
+                        <div className="px-3 py-1 text-xs tracking-widest uppercase w-fit border" style={{ color: "#9a6b2f", borderColor: "#d8bd91", background: "#d8bd9118", fontFamily: "var(--font-body)" }}>
+                          Chờ xử lý hủy / hoàn tiền
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center gap-4">
                       <p
@@ -294,6 +376,14 @@ export default function OrdersPage({ navigate }: OrdersPageProps) {
 
                   {isExpanded && (
                     <div style={{ borderTop: "1px solid var(--color-champagne)" }}>
+                      {order.cancellationStatus && order.cancellationStatus !== "none" && (
+                        <div className="px-6 py-3 text-xs leading-relaxed" style={{ background: order.cancellationStatus === "requested" ? "#d8bd9118" : "rgba(90,138,106,0.08)", color: order.cancellationStatus === "requested" ? "#8a642f" : "#456b50", fontFamily: "var(--font-body)" }}>
+                          <p className="font-medium">
+                            {order.cancellationStatus === "requested" ? "Yêu cầu hủy đang chờ Admin xác nhận xử lý hoàn tiền." : "Đơn hàng đã được hủy."}
+                          </p>
+                          {order.cancellationReason && <p className="mt-1">Lý do: {cancellationReasonLabels[order.cancellationReason] || order.cancellationReason}{order.cancellationReasonDetail ? ` — ${order.cancellationReasonDetail}` : ""}</p>}
+                        </div>
+                      )}
                       {order.status !== "cancelled" && (
                         <div
                           className="px-6 py-5"
@@ -396,7 +486,7 @@ export default function OrdersPage({ navigate }: OrdersPageProps) {
                                 }}
                                 className="text-xs"
                               >
-                                {item.variant} × {item.qty}
+                                {item.qty} sản phẩm
                               </p>
                             </div>
                             <p
@@ -436,6 +526,7 @@ export default function OrdersPage({ navigate }: OrdersPageProps) {
                             Thanh toán:{" "}
                             <span style={{ color: "var(--color-charcoal)" }}>
                               {paymentLabel[order.payment]}
+                              {order.paymentStatus && ` · ${order.paymentStatus === "unpaid" && order.payment === "cod" ? "Thanh toán khi nhận hàng" : paymentStatusLabel[order.paymentStatus] || order.paymentStatus}`}
                             </span>
                           </p>
                           <p
@@ -458,9 +549,9 @@ export default function OrdersPage({ navigate }: OrdersPageProps) {
                           </p>
                         </div>
                         <div className="flex gap-2 items-end">
-                          {order.status === "pending" && (
+                          {order.status === "pending" && order.cancellationStatus !== "requested" && (
                             <button
-                              onClick={() => setCancelTarget(order.id)}
+                              onClick={() => { setCancelTarget(order.id); setCancelReason(""); setCancelReasonDetail(""); setCancelError(""); setNotice(null); }}
                               style={{
                                 border: "1px solid #c0392b",
                                 color: "#c0392b",
@@ -498,6 +589,8 @@ export default function OrdersPage({ navigate }: OrdersPageProps) {
               background: "var(--color-cream)",
               maxWidth: "420px",
               width: "100%",
+              maxHeight: "90vh",
+              overflowY: "auto",
             }}
             className="p-8"
             onClick={(e) => e.stopPropagation()}
@@ -520,6 +613,41 @@ export default function OrdersPage({ navigate }: OrdersPageProps) {
             >
               Bạn có chắc muốn huỷ đơn <strong>{cancelTarget}</strong>?
             </p>
+            <fieldset className="mb-5 space-y-2">
+              <legend className="text-xs tracking-widest uppercase mb-3" style={{ color: "var(--color-charcoal)", fontFamily: "var(--font-body)" }}>
+                Vui lòng chọn lý do hủy
+              </legend>
+              {cancellationReasons.map(([value, label]) => (
+                <label key={value} className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: "var(--color-warm-gray)", fontFamily: "var(--font-body)" }}>
+                  <input
+                    type="radio"
+                    name="cancel-reason"
+                    value={value}
+                    checked={cancelReason === value}
+                    onChange={() => { setCancelReason(value); setCancelError(""); }}
+                    disabled={cancelling}
+                  />
+                  {label}
+                </label>
+              ))}
+              {cancelReason === "other" && (
+                <textarea
+                  value={cancelReasonDetail}
+                  onChange={(event) => { setCancelReasonDetail(event.target.value); setCancelError(""); }}
+                  maxLength={500}
+                  rows={3}
+                  placeholder="Nhập lý do của bạn..."
+                  className="mt-2 w-full border bg-white p-3 text-sm outline-none"
+                  style={{ borderColor: "var(--color-champagne)", color: "var(--color-charcoal)", fontFamily: "var(--font-body)" }}
+                />
+              )}
+              {cancelError && <p role="alert" className="text-xs" style={{ color: "#c0392b" }}>{cancelError}</p>}
+            </fieldset>
+            {orders.find((order) => order.id === cancelTarget)?.payment !== "cod" && (
+              <p className="mb-5 text-xs leading-relaxed" style={{ color: "#9a6b2f", fontFamily: "var(--font-body)" }}>
+                Đơn đã thanh toán qua chuyển khoản/thẻ sẽ được gửi yêu cầu hủy. Đơn chỉ được xác nhận hủy sau khi Admin xử lý khoản thanh toán/hoàn tiền.
+              </p>
+            )}
             <div className="flex gap-3">
               <button
                 onClick={() => setCancelTarget(null)}

@@ -131,15 +131,7 @@ function OrderSummary({
               >
                 {item.name}
               </p>
-              <p
-                style={{
-                  color: "var(--color-warm-gray)",
-                  fontFamily: "var(--font-body)",
-                }}
-                className="text-xs"
-              >
-                {item.variant}
-              </p>
+
             </div>
             <p
               style={{
@@ -477,7 +469,9 @@ export default function CheckoutPage({
   const [address, setAddress] = useState(user?.address ?? "");
   const [city, setCity] = useState(user?.city ?? "TP.HCM");
   const [note, setNote] = useState("");
-  const [payment, setPayment] = useState<"cod" | "transfer">("cod");
+  const [payment, setPayment] = useState<"cod" | "transfer" | "card">("cod");
+  const [transferInfo, setTransferInfo] = useState<{ bankCode: string; account: string; accountName: string; reference: string; amount: number; qrUrl: string } | null>(null);
+  const cardPaymentEnabled = import.meta.env.VITE_CARD_PAYMENT_ENABLED === "true";
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [placing, setPlacing] = useState(false);
   const [lastOrder, setLastOrder] = useState<Order | null>(null);
@@ -563,7 +557,13 @@ export default function CheckoutPage({
         shippingFee: shipping,
         discount,
         couponCode: appliedPromo?.code,
-      } as any);
+      });
+
+      if (data.paymentUrl) {
+        window.location.assign(data.paymentUrl);
+        return;
+      }
+      setTransferInfo(data.transferInstructions ?? null);
 
       const order: Order = {
         id: data.orderCode || data._id,
@@ -576,6 +576,7 @@ export default function CheckoutPage({
         city: data.shippingCity,
         phone: data.phone,
         payment: data.paymentMethod,
+        paymentStatus: data.paymentStatus,
         note: data.note,
         createdAt:
           data.createdAt?.slice(0, 10) ||
@@ -744,7 +745,7 @@ export default function CheckoutPage({
               }}
               className="text-xs tracking-widest uppercase font-medium"
             >
-              Đã thanh toán
+              {lastOrder?.paymentStatus === "paid" ? "Đã thanh toán" : orderPayment === "cod" ? "Thanh toán khi nhận hàng" : "Cần thanh toán"}
             </span>
             <span
               style={{
@@ -757,6 +758,21 @@ export default function CheckoutPage({
             </span>
           </div>
 
+          {orderPayment === "transfer" && transferInfo && (
+            <div className="mt-4 border-t pt-4" style={{ borderColor: "var(--color-champagne)" }}>
+              <p className="text-sm font-medium mb-2">Quét QR hoặc chuyển khoản với nội dung chính xác bên dưới.</p>
+              {transferInfo.qrUrl && <img src={transferInfo.qrUrl} alt="QR chuyển khoản" className="w-48 h-48 mx-auto mb-3" />}
+              <div className="space-y-1 text-xs">
+                {transferInfo.bankCode && <p>Ngân hàng: {transferInfo.bankCode}</p>}
+                {transferInfo.account && <p>Số tài khoản: {transferInfo.account}</p>}
+                {transferInfo.accountName && <p>Chủ tài khoản: {transferInfo.accountName}</p>}
+                <p>Số tiền: <strong>{fmt(transferInfo.amount)}</strong></p>
+                <p>Nội dung chuyển khoản: <strong>{transferInfo.reference}</strong></p>
+              </div>
+              {!transferInfo.account && <p className="text-xs mt-2">Cửa hàng chưa cấu hình tài khoản nhận tiền; vui lòng liên hệ cửa hàng trước khi chuyển khoản.</p>}
+            </div>
+          )}
+
           <p
             style={{
               color: "var(--color-warm-gray)",
@@ -765,9 +781,7 @@ export default function CheckoutPage({
             className="text-xs mt-3"
           >
             Phương thức:{" "}
-            {orderPayment === "cod"
-              ? "Thanh toán khi nhận hàng (COD)"
-              : "Chuyển khoản ngân hàng"}
+            {orderPayment === "cod" ? "Thanh toán khi nhận hàng (COD)" : orderPayment === "card" ? "Thẻ qua VNPAY" : "Chuyển khoản ngân hàng — đang chờ xác nhận"}
           </p>
         </div>
 
@@ -972,6 +986,7 @@ export default function CheckoutPage({
                     [
                       ["cod", "Thanh toán khi nhận hàng (COD)"],
                       ["transfer", "Chuyển khoản ngân hàng"],
+                      ...(cardPaymentEnabled ? [["card", "Thẻ tín dụng / ghi nợ (VNPAY)"] as const] : []),
                     ] as const
                   ).map(([val, label]) => (
                     <button

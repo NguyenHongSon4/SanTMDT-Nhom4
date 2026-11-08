@@ -15,6 +15,12 @@ const generateOrderCode = () => {
 
 // Đặt hàng (từ giỏ hàng)
 const createOrder = async (userId, orderData) => {
+  const paymentMethod = orderData.paymentMethod || "cod";
+  if (!["cod", "transfer", "card"].includes(paymentMethod)) {
+    const error = new Error("Phương thức thanh toán không hợp lệ");
+    error.statusCode = 400;
+    throw error;
+  }
   const cart = await Cart.findOne({ userId }).populate("items.productId");
   if (!cart || cart.items.length === 0) {
     const error = new Error("Giỏ hàng trống, không thể đặt hàng");
@@ -54,7 +60,7 @@ const createOrder = async (userId, orderData) => {
     (sum, item) => sum + item.price * item.quantity,
     0
   );
-  const shippingFee = orderData.shippingFee ?? 30000;
+  const shippingFee = subtotal >= 500000 ? 0 : 30000;
 
   // Xử lý mã giảm giá phía server (không tin discount từ client)
   let discount = 0;
@@ -110,7 +116,8 @@ const createOrder = async (userId, orderData) => {
     shippingWard: orderData.shippingWard || "",
     shippingCity: orderData.shippingCity,
     note: orderData.note || "",
-    paymentMethod: orderData.paymentMethod || "cod",
+    paymentMethod,
+    paymentStatus: paymentMethod === "cod" ? "unpaid" : "pending",
     subtotal,
     shippingFee,
     discount,
@@ -142,7 +149,17 @@ const getMyOrderById = async (userId, orderId) => {
 };
 
 // Khách hủy đơn (chỉ khi pending)
-const cancelOrder = async (userId, orderId) => {
+const cancellationReasons = new Set([
+  "ordered_by_mistake",
+  "changed_mind",
+  "found_better_price",
+  "delivery_too_slow",
+  "wrong_address",
+  "change_items",
+  "other",
+]);
+
+const cancelOrder = async (userId, orderId, reason, reasonDetail = "") => {
   const order = await Order.findOne({ _id: orderId, userId });
   if (!order) {
     const error = new Error("Không tìm thấy đơn hàng");
@@ -150,15 +167,79 @@ const cancelOrder = async (userId, orderId) => {
     throw error;
   }
 
-  if (order.status !== "pending") {
+  if (order.status !== "pending" || order.cancellationStatus === "requested") {
     const error = new Error("Chỉ có thể hủy đơn đang chờ xác nhận");
     error.statusCode = 400;
     throw error;
   }
 
-  order.status = "cancelled";
-  await order.save();
-  return order;
+  if (!cancellationReasons.has(reason)) {
+    const error = new Error("Vui lòng chọn lý do hủy đơn hợp lệ");
+    error.statusCode = 400;
+    throw error;
+  }
+  if (reason === "other" && !String(reasonDetail).trim()) {
+    const error = new Error("Vui lòng nhập lý do cụ thể");
+    error.statusCode = 400;
+    throw error;
+  }
+  order.cancellationReason = reason;
+  order.cancellationReasonDetail = String(reasonDetail).trim().slice(0, 500);
+  order.cancellationRequestedAt = new Date();
+  if (order.paymentMethod === "cod") {
+    order.status = "cancelled";
+    order.cancellationStatus = "completed";
+  } else {
+    order.cancellationStatus = "requested";
+  }
+  const updatedOrder = await Order.findOneAndUpdate(
+    { _id: order._id, userId, status: "pending", cancellationStatus: { $ne: "requested" } },
+    {
+      $set: {
+        status: order.status,
+        cancellationStatus: order.cancellationStatus,
+        cancellationReason: order.cancellationReason,
+        cancellationReasonDetail: order.cancellationReasonDetail,
+        cancellationRequestedAt: order.cancellationRequestedAt,
+      },
+    },
+    { new: true, runValidators: true },
+  );
+  if (!updatedOrder) {
+    const error = new Error("Đơn hàng đã được Admin xác nhận hoặc đã có yêu cầu hủy");
+    error.statusCode = 400;
+    throw error;
+  }
+  return updatedOrder;
+};
+
+const completeCancellation = async (orderId) => {
+  const order = await Order.findById(orderId);
+  if (!order) {
+    const error = new Error("Không tìm thấy đơn hàng");
+    error.statusCode = 404;
+    throw error;
+  }
+  if (order.status !== "pending" || order.cancellationStatus !== "requested") {
+    const error = new Error("Đơn hàng không có yêu cầu hủy đang chờ xử lý");
+    error.statusCode = 400;
+    throw error;
+  }
+  const update = { status: "cancelled", cancellationStatus: "completed" };
+  const paymentStatusFilter = order.paymentStatus === "paid" ? "paid" : { $ne: "paid" };
+  if (order.paymentStatus === "paid") update.paymentStatus = "refunded";
+  else if (order.paymentStatus === "pending") update.paymentStatus = "unpaid";
+  const updatedOrder = await Order.findOneAndUpdate(
+    { _id: order._id, status: "pending", cancellationStatus: "requested", paymentStatus: paymentStatusFilter },
+    { $set: update },
+    { new: true, runValidators: true },
+  );
+  if (!updatedOrder) {
+    const error = new Error("Yêu cầu hủy đơn đã được xử lý");
+    error.statusCode = 400;
+    throw error;
+  }
+  return updatedOrder;
 };
 
 // Admin xem tất cả đơn
@@ -192,7 +273,7 @@ const updateOrderStatus = async (orderId, newStatus) => {
 
   const validTransitions = {
     pending: ["confirmed", "cancelled"],
-    confirmed: ["shipping", "cancelled"],
+    confirmed: ["shipping"],
     shipping: ["completed"],
     completed: [],
     cancelled: [],
@@ -202,6 +283,16 @@ const updateOrderStatus = async (orderId, newStatus) => {
     const error = new Error(
       `Không thể chuyển từ "${order.status}" sang "${newStatus}"`
     );
+    error.statusCode = 400;
+    throw error;
+  }
+  if (order.cancellationStatus === "requested") {
+    const error = new Error("Không thể cập nhật đơn khi yêu cầu hủy đang chờ xử lý");
+    error.statusCode = 400;
+    throw error;
+  }
+  if (newStatus === "cancelled" && order.paymentMethod !== "cod") {
+    const error = new Error("Đơn thanh toán trực tuyến cần được xử lý qua yêu cầu hủy");
     error.statusCode = 400;
     throw error;
   }
@@ -233,9 +324,66 @@ const updateOrderStatus = async (orderId, newStatus) => {
     }
   }
 
-  order.status = newStatus;
-  await order.save();
-  return order;
+  const cancellationStatus = newStatus === "cancelled" ? "completed" : order.cancellationStatus;
+  const updateFields = {
+    status: newStatus,
+    cancellationStatus,
+    ...(newStatus === "completed" ? { completedAt: new Date() } : {}),
+  };
+  const updatedOrder = await Order.findOneAndUpdate(
+    { _id: order._id, status: order.status, cancellationStatus: { $ne: "requested" } },
+    { $set: updateFields },
+    { new: true, runValidators: true },
+  );
+  if (!updatedOrder) {
+    if (newStatus === "confirmed") {
+      for (const item of order.items) {
+        const product = await Product.findById(item.productId);
+        if (!product) continue;
+        product.stock += item.quantity;
+        await product.save();
+      }
+    }
+    const error = new Error("Đơn đã thay đổi trạng thái; vui lòng tải lại trước khi cập nhật");
+    error.statusCode = 409;
+    throw error;
+  }
+  return updatedOrder;
+};
+
+const updatePaymentStatus = async (orderId, newStatus) => {
+  if (!["paid", "failed", "refunded"].includes(newStatus)) {
+    const error = new Error("Trạng thái thanh toán không hợp lệ");
+    error.statusCode = 400;
+    throw error;
+  }
+  const order = await Order.findById(orderId);
+  if (!order) {
+    const error = new Error("Không tìm thấy đơn hàng");
+    error.statusCode = 404;
+    throw error;
+  }
+  if (order.paymentMethod === "card" && newStatus === "paid") {
+    const error = new Error("Giao dịch thẻ chỉ được xác nhận từ thông báo đã ký của cổng thanh toán");
+    error.statusCode = 400;
+    throw error;
+  }
+  if (order.status === "cancelled" && newStatus === "paid") {
+    const error = new Error("Không thể ghi nhận thanh toán cho đơn đã hủy");
+    error.statusCode = 400;
+    throw error;
+  }
+  const updatedOrder = await Order.findOneAndUpdate(
+    { _id: order._id, status: { $ne: "cancelled" } },
+    { $set: { paymentStatus: newStatus } },
+    { new: true, runValidators: true },
+  );
+  if (!updatedOrder) {
+    const error = new Error("Không thể cập nhật thanh toán cho đơn đã hủy");
+    error.statusCode = 400;
+    throw error;
+  }
+  return updatedOrder;
 };
 
 module.exports = {
@@ -246,4 +394,6 @@ module.exports = {
   getAllOrders,
   getOrderById,
   updateOrderStatus,
+  updatePaymentStatus,
+  completeCancellation,
 };

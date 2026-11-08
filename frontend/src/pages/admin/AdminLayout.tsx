@@ -28,6 +28,15 @@ const navItems: { page: Page; label: string; icon: React.ReactNode }[] = [
     ),
   },
   {
+    page: "admin-revenue",
+    label: "Doanh Thu",
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-5 5"/>
+      </svg>
+    ),
+  },
+  {
     page: "admin-orders",
     label: "Đơn Hàng",
     icon: (

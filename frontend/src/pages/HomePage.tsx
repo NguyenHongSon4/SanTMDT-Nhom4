@@ -275,7 +275,7 @@ useEffect(() => {
             {[
               { title: "Sản Phẩm", links: ["Dưỡng Da", "Nước Hoa", "Dưỡng Thể", "Mặt Nạ"] },
               { title: "Hỗ Trợ", links: ["Chính Sách Đổi Trả", "Hướng Dẫn Mua Hàng", "Liên Hệ", "FAQ"] },
-              { title: "Về Chúng Tôi", links: ["Câu Chuyện Thương Hiệu", "Thành Phần", "Chứng Nhận", "Blog"] },
+              { title: "Về Chúng Tôi", links: ["Câu Chuyện Thương Hiệu", "Chứng Nhận"] },
             ].map((col) => (
               <div key={col.title}>
                 <p style={{ color: "var(--color-champagne)", fontFamily: "var(--font-body)" }} className="text-xs tracking-widest uppercase mb-4 font-medium">
@@ -284,9 +284,63 @@ useEffect(() => {
                 <ul className="space-y-2">
                   {col.links.map((l) => (
                     <li key={l}>
-                      <span style={{ color: "var(--color-warm-gray)", fontFamily: "var(--font-body)" }} className="text-xs font-light hover:text-[var(--color-champagne)] transition-colors cursor-pointer">
-                        {l}
-                      </span>
+                      {col.title === "Sản Phẩm" ? (
+                        <button
+                          type="button"
+                          onClick={() => navigate("products")}
+                          style={{ color: "var(--color-warm-gray)", fontFamily: "var(--font-body)" }}
+                          className="text-xs font-light hover:text-[var(--color-champagne)] transition-colors text-left"
+                        >
+                          {l}
+                        </button>
+                      ) : col.title === "Hỗ Trợ" && l === "Chính Sách Đổi Trả" ? (
+                        <button
+                          type="button"
+                          onClick={() => navigate("return-policy")}
+                          style={{ color: "var(--color-warm-gray)", fontFamily: "var(--font-body)" }}
+                          className="text-xs font-light hover:text-[var(--color-champagne)] transition-colors text-left"
+                        >
+                          {l}
+                        </button>
+                      ) : col.title === "Hỗ Trợ" && l === "Hướng Dẫn Mua Hàng" ? (
+                        <button
+                          type="button"
+                          onClick={() => navigate("buying-guide")}
+                          style={{ color: "var(--color-warm-gray)", fontFamily: "var(--font-body)" }}
+                          className="text-xs font-light hover:text-[var(--color-champagne)] transition-colors text-left"
+                        >
+                          {l}
+                        </button>
+                      ) : col.title === "Hỗ Trợ" && l === "Liên Hệ" ? (
+                        <span className="group relative inline-flex" style={{ color: "var(--color-warm-gray)", fontFamily: "var(--font-body)" }}>
+                          <span className="text-xs font-light hover:text-[var(--color-champagne)] transition-colors cursor-default">{l}</span>
+                          <span role="tooltip" className="pointer-events-none absolute left-0 top-full z-20 mt-2 whitespace-nowrap border px-3 py-2 text-xs opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-within:opacity-100" style={{ background: "var(--color-charcoal)", borderColor: "var(--color-champagne)", color: "var(--color-champagne)" }}>
+                            Hotline: 1900 8989
+                          </span>
+                        </span>
+                      ) : col.title === "Về Chúng Tôi" && l === "Câu Chuyện Thương Hiệu" ? (
+                        <button
+                          type="button"
+                          onClick={() => navigate("brand-story")}
+                          style={{ color: "var(--color-warm-gray)", fontFamily: "var(--font-body)" }}
+                          className="text-xs font-light hover:text-[var(--color-champagne)] transition-colors text-left"
+                        >
+                          {l}
+                        </button>
+                      ) : col.title === "Về Chúng Tôi" && l === "Chứng Nhận" ? (
+                        <button
+                          type="button"
+                          onClick={() => navigate("certifications")}
+                          style={{ color: "var(--color-warm-gray)", fontFamily: "var(--font-body)" }}
+                          className="text-xs font-light hover:text-[var(--color-champagne)] transition-colors text-left"
+                        >
+                          {l}
+                        </button>
+                      ) : (
+                        <span style={{ color: "var(--color-warm-gray)", fontFamily: "var(--font-body)" }} className="text-xs font-light hover:text-[var(--color-champagne)] transition-colors cursor-pointer">
+                          {l}
+                        </span>
+                      )}
                     </li>
                   ))}
                 </ul>

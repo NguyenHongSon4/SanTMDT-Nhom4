@@ -27,6 +27,8 @@ import {
 import { getToken } from "./services/api";
 import { getMe, logout } from "./services/authService";
 import AdminBrands from "./pages/admin/AdminBrands";
+import AdminRevenue from "./pages/admin/AdminRevenue";
+import SupportInfoPage from "./pages/SupportInfoPage";
 
 
 export type Page =
@@ -38,7 +40,12 @@ export type Page =
   | "checkout"
   | "orders"
   | "profile"
+  | "return-policy"
+  | "buying-guide"
+  | "brand-story"
+  | "certifications"
   | "admin-dashboard"
+  | "admin-revenue"
   | "admin-products"
   | "admin-orders"
   | "admin-users"
@@ -94,7 +101,11 @@ export interface Order {
   address: string;
   city: string;
   phone: string;
-  payment: "cod" | "transfer";
+  payment: "cod" | "transfer" | "card";
+  paymentStatus?: "unpaid" | "pending" | "paid" | "failed" | "refunded";
+  cancellationStatus?: "none" | "requested" | "completed";
+  cancellationReason?: string;
+  cancellationReasonDetail?: string;
   note?: string;
   createdAt: string;
   status: "pending" | "confirmed" | "shipping" | "completed" | "cancelled";
@@ -108,6 +119,14 @@ export default function App() {
   const [orders, setOrders] = useState<Order[]>([]);
 
   // Khôi phục session khi reload trang
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("paymentResult")) {
+      setPage("orders");
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
+
   useEffect(() => {
     getMe().then((u) => {
       if (u) {
@@ -200,6 +219,7 @@ const updateCart = async (id: string, variant: string, qty: number) => {
 
   const adminContent = (() => {
     if (page === "admin-dashboard") return <AdminDashboard navigate={navigate} />;
+    if (page === "admin-revenue") return <AdminRevenue />;
     if (page === "admin-products") return <AdminProducts />;
     if (page === "admin-orders") return <AdminOrders />;
     if (page === "admin-users") return <AdminUsers />;
@@ -231,6 +251,9 @@ const updateCart = async (id: string, variant: string, qty: number) => {
             <CheckoutPage cart={cart} navigate={navigate} user={user} onOrderPlaced={handleOrderPlaced} />
           )}
           {page === "orders" && <OrdersPage navigate={navigate} />}
+          {(page === "return-policy" || page === "buying-guide" || page === "brand-story" || page === "certifications") && (
+            <SupportInfoPage page={page} navigate={navigate} />
+          )}
           {page === "profile" && user && (
             <ProfilePage user={user} navigate={navigate} onLogout={handleLogout} onUpdateUser={handleUpdateUser} />
           )}

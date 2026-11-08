@@ -6,10 +6,11 @@ export interface CreateOrderPayload {
   shippingAddress: string;
   shippingCity: string;
   shippingWard?: string;
-  paymentMethod?: "cod" | "transfer";
+  paymentMethod?: "cod" | "transfer" | "card";
   note?: string;
   shippingFee?: number;
   discount?: number;
+  couponCode?: string;
 }
 
 export interface OrderFromApi {
@@ -28,7 +29,11 @@ export interface OrderFromApi {
   shippingWard?: string;
   shippingCity: string;
   note?: string;
-  paymentMethod: "cod" | "transfer";
+  paymentMethod: "cod" | "transfer" | "card";
+  paymentStatus?: "unpaid" | "pending" | "paid" | "failed" | "refunded";
+  cancellationStatus?: "none" | "requested" | "completed";
+  cancellationReason?: string;
+  cancellationReasonDetail?: string;
   subtotal: number;
   shippingFee: number;
   discount: number;
@@ -41,6 +46,10 @@ interface CreateOrderResponse {
   success: boolean;
   message: string;
   data: OrderFromApi;
+  paymentUrl?: string;
+  transferInstructions?: {
+    bankCode: string; account: string; accountName: string; reference: string; amount: number; qrUrl: string;
+  };
 }
 
 interface MyOrdersResponse {
@@ -55,7 +64,7 @@ export async function createOrder(payload: CreateOrderPayload) {
     method: "POST",
     body: JSON.stringify(payload),
   });
-  return res.data;
+  return { ...res.data, paymentUrl: res.paymentUrl, transferInstructions: res.transferInstructions };
 }
 
 // Lịch sử đơn của tôi
@@ -65,10 +74,10 @@ export async function getMyOrders() {
 }
 
 // Hủy đơn (chỉ pending)
-export async function cancelMyOrder(orderId: string) {
+export async function cancelMyOrder(orderId: string, reason: string, reasonDetail?: string) {
   const res = await apiRequest<{ success: boolean; message: string; data: OrderFromApi }>(
     `/orders/my/${orderId}/cancel`,
-    { method: "PUT" }
+    { method: "PUT", body: JSON.stringify({ reason, reasonDetail }) }
   );
   return res.data;
 }
@@ -105,5 +114,21 @@ export async function updateOrderStatus(
     method: "PUT",
     body: JSON.stringify({ status }),
   });
+  return res.data;
+}
+
+export async function updatePaymentStatus(orderId: string, paymentStatus: "paid" | "failed" | "refunded") {
+  const res = await apiRequest<{ success: boolean; message: string; data: AdminOrderFromApi }>(
+    `/orders/${orderId}/payment-status`,
+    { method: "PUT", body: JSON.stringify({ paymentStatus }) }
+  );
+  return res.data;
+}
+
+export async function completeOrderCancellation(orderId: string) {
+  const res = await apiRequest<{ success: boolean; message: string; data: AdminOrderFromApi }>(
+    `/orders/${orderId}/cancellation/complete`,
+    { method: "PUT" }
+  );
   return res.data;
 }

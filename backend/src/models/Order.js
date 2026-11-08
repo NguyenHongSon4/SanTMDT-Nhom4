@@ -57,9 +57,16 @@ const orderSchema = new mongoose.Schema(
     },
     paymentMethod: {
       type: String,
-      enum: ["cod", "transfer"],
+      enum: ["cod", "transfer", "card"],
       default: "cod",
     },
+    paymentStatus: {
+      type: String,
+      enum: ["unpaid", "pending", "paid", "failed", "refunded"],
+      default: "unpaid",
+      index: true,
+    },
+    paymentTransactionId: { type: String, default: "" },
     subtotal: {
       type: Number,
       required: true,
@@ -87,6 +94,19 @@ const orderSchema = new mongoose.Schema(
       enum: ["pending", "confirmed", "shipping", "completed", "cancelled"],
       default: "pending",
     },
+    cancellationStatus: {
+      type: String,
+      enum: ["none", "requested", "completed"],
+      default: "none",
+    },
+    cancellationReason: {
+      type: String,
+      enum: ["ordered_by_mistake", "changed_mind", "found_better_price", "delivery_too_slow", "wrong_address", "change_items", "other", ""],
+      default: "",
+    },
+    cancellationReasonDetail: { type: String, default: "", maxlength: 500 },
+    cancellationRequestedAt: { type: Date, default: null },
+    completedAt: { type: Date, default: null, index: true },
   },
   {
     timestamps: true,

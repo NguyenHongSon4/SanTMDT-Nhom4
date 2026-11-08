@@ -70,11 +70,11 @@ export default function CartPage({ cart, updateCart, navigate }: CartPageProps) 
             {/* Items */}
             <div className="lg:col-span-2 space-y-0">
               <div style={{ borderBottom: "1px solid var(--color-champagne)" }} className="pb-4 mb-4 hidden md:grid grid-cols-12 gap-4">
-                {["Sản Phẩm", "Dung Tích", "Số Lượng", "Thành Tiền"].map((h, i) => (
+                {["Sản Phẩm", "Số Lượng", "Thành Tiền"].map((h, i) => (
                   <p
                     key={h}
                     style={{ color: "var(--color-warm-gray)", fontFamily: "var(--font-body)" }}
-                    className={`text-xs tracking-widest uppercase ${i === 0 ? "col-span-5" : i === 1 ? "col-span-2 text-center" : i === 2 ? "col-span-3 text-center" : "col-span-2 text-right"}`}
+                    className={`text-xs tracking-widest uppercase ${i === 0 ? "col-span-6" : i === 1 ? "col-span-3 text-center" : "col-span-3 text-right"}`}
                   >
                     {h}
                   </p>
@@ -88,7 +88,7 @@ export default function CartPage({ cart, updateCart, navigate }: CartPageProps) 
                   className="py-6 grid grid-cols-12 gap-4 items-center"
                 >
                   {/* Product */}
-                  <div className="col-span-12 md:col-span-5 flex gap-4 items-center">
+                  <div className="col-span-12 md:col-span-6 flex gap-4 items-center">
                     <div style={{ background: "var(--color-mist)", width: "72px", height: "90px", flexShrink: 0 }}>
                       <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
                     </div>
@@ -100,13 +100,6 @@ export default function CartPage({ cart, updateCart, navigate }: CartPageProps) 
                         {fmt(item.price)}
                       </p>
                     </div>
-                  </div>
-
-                  {/* Variant */}
-                  <div className="col-span-4 md:col-span-2 text-center">
-                    <span style={{ color: "var(--color-warm-gray)", fontFamily: "var(--font-body)" }} className="text-xs tracking-widest uppercase">
-                      {item.variant}
-                    </span>
                   </div>
 
                   {/* Qty */}
@@ -133,7 +126,7 @@ export default function CartPage({ cart, updateCart, navigate }: CartPageProps) 
                   </div>
 
                   {/* Total + Remove */}
-                  <div className="col-span-3 md:col-span-2 flex items-center justify-end gap-3">
+                  <div className="col-span-7 md:col-span-3 flex items-center justify-end gap-3">
                     <span style={{ color: "var(--color-charcoal)", fontFamily: "var(--font-body)" }} className="text-sm font-medium">
                       {fmt(item.price * item.qty)}
                     </span>
