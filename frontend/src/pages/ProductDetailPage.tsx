@@ -6,16 +6,17 @@ import ReviewSection from "../components/ReviewSection";
 
 interface Props {
   product: Product;
-  navigate: (p: Page, product?: Product) => void;
+  navigate: (p: Page, product?: Product, openReview?: boolean) => void;
   addToCart: (product: Product, variant: string, qty: number) => void;
   user: AppUser | null;
+  openReviewOnLoad?: boolean;
 }
 
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "₫";
 
 const DEFAULT_VARIANT = "Mặc định";
 
-export default function ProductDetailPage({ product, navigate, addToCart, user }: Props) {
+export default function ProductDetailPage({ product, navigate, addToCart, user, openReviewOnLoad = false }: Props) {
   const [qty, setQty] = useState(1);
   const [tab, setTab] = useState<"desc" | "ingredients" | "guide">("desc");
   const [added, setAdded] = useState(false);
@@ -81,7 +82,7 @@ export default function ProductDetailPage({ product, navigate, addToCart, user }
             <div className="flex items-center gap-2 mb-6">
               <div className="flex gap-1">
                 {Array.from({ length: 5 }).map((_, i) => (
-                  <svg key={i} width="13" height="13" viewBox="0 0 24 24" fill={i < Math.floor(liveRating) ? "var(--color-gold)" : "none"} stroke="var(--color-gold)" strokeWidth="1.5">
+                  <svg key={i} width="13" height="13" viewBox="0 0 24 24" fill={i < Math.round(liveRating) ? "var(--color-gold)" : "none"} stroke="var(--color-gold)" strokeWidth="1.5">
                     <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                   </svg>
                 ))}
@@ -228,6 +229,7 @@ export default function ProductDetailPage({ product, navigate, addToCart, user }
             setLiveRating(avg);
             setLiveReviewCount(count);
           }}
+          openFormOnLoad={openReviewOnLoad}
         />
 
         {/* Related */}

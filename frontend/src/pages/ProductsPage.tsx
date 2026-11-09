@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import type { Page, Product } from "../App";
 import { fetchProducts } from "../services/productService";
+import { fetchActiveBrands } from "../services/brandService";
 import ProductCard from "../components/ProductCard";
 
 interface ProductsPageProps {
@@ -9,16 +10,15 @@ interface ProductsPageProps {
 
 const sortOptions = [
   { value: "default", label: "Mặc Định" },
+  { value: "name_asc", label: "Tên A – Z" },
+  { value: "name_desc", label: "Tên Z – A" },
   { value: "price_asc", label: "Giá Tăng Dần" },
   { value: "price_desc", label: "Giá Giảm Dần" },
 ];
 
-const priceRanges = [
-  { label: "Tất Cả", min: 0, max: Infinity },
-  { label: "< 500k", min: 0, max: 500000 },
-  { label: "500k – 1 triệu", min: 500000, max: 1000000 },
-  { label: "> 1 triệu", min: 1000000, max: Infinity },
-];
+const MIN_PRICE = 1_000;
+const MAX_PRICE = 100_000_000;
+const formatPrice = (price: number) => `${price.toLocaleString("vi-VN")} đ`;
 
 export default function ProductsPage({ navigate }: ProductsPageProps) {
   const [products, setProducts] = useState<Product[]>([]);
@@ -26,7 +26,15 @@ export default function ProductsPage({ navigate }: ProductsPageProps) {
   const [error, setError] = useState("");
   const [sort, setSort] = useState("default");
   const [search, setSearch] = useState("");
-  const [priceRangeIdx, setPriceRangeIdx] = useState(0);
+  const [brandId, setBrandId] = useState("");
+  const [brands, setBrands] = useState<{ id: string; name: string }[]>([]);
+  const [priceFilterEnabled, setPriceFilterEnabled] = useState(false);
+  const [minPrice, setMinPrice] = useState(MIN_PRICE);
+  const [maxPrice, setMaxPrice] = useState(MAX_PRICE);
+
+  useEffect(() => {
+    fetchActiveBrands().then(setBrands).catch(() => setBrands([]));
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -34,11 +42,11 @@ export default function ProductsPage({ navigate }: ProductsPageProps) {
       setLoading(true);
       setError("");
       try {
-        const selectedRange = priceRanges[priceRangeIdx];
         const data = await fetchProducts({
           search: search || undefined,
-          minPrice: selectedRange.min > 0 ? selectedRange.min : undefined,
-          maxPrice: selectedRange.max < Infinity ? selectedRange.max : undefined,
+          brandId: brandId || undefined,
+          minPrice: priceFilterEnabled ? minPrice : undefined,
+          maxPrice: priceFilterEnabled ? maxPrice : undefined,
           sort: sort === "default" ? undefined : sort,
         });
         if (!cancelled) setProducts(data);
@@ -52,7 +60,7 @@ export default function ProductsPage({ navigate }: ProductsPageProps) {
     return () => {
       cancelled = true;
     };
-  }, [search, sort, priceRangeIdx]);
+  }, [search, sort, brandId, priceFilterEnabled, minPrice, maxPrice]);
 
   return (
     <div style={{ paddingTop: "64px", minHeight: "100vh", background: "var(--color-cream)" }}>
@@ -83,7 +91,7 @@ export default function ProductsPage({ navigate }: ProductsPageProps) {
         </div>
 
         {/* Filters */}
-        <div className="flex flex-wrap gap-3 mb-8 items-center">
+        <div className="flex flex-wrap gap-3 mb-5 items-center">
           <select
             value={sort}
             onChange={(e) => setSort(e.target.value)}
@@ -97,22 +105,60 @@ export default function ProductsPage({ navigate }: ProductsPageProps) {
             ))}
           </select>
 
-          {priceRanges.map((r, i) => (
-            <button
-              key={r.label}
-              onClick={() => setPriceRangeIdx(i)}
-              className="px-3 py-2 text-xs tracking-widest uppercase"
-              style={{
-                fontFamily: "var(--font-body)",
-                background: priceRangeIdx === i ? "var(--color-charcoal)" : "transparent",
-                color: priceRangeIdx === i ? "white" : "var(--color-charcoal)",
-                border: "1px solid var(--color-champagne)",
-              }}
-            >
-              {r.label}
-            </button>
-          ))}
+          <select
+            value={brandId}
+            onChange={(e) => setBrandId(e.target.value)}
+            className="px-3 py-2 text-sm bg-transparent"
+            style={{ border: "1px solid var(--color-champagne)", fontFamily: "var(--font-body)" }}
+            aria-label="Lọc theo thương hiệu"
+          >
+            <option value="">Tất cả thương hiệu</option>
+            {brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
+          </select>
         </div>
+
+        <section className="mb-8 p-4 md:p-5" style={{ border: "1px solid var(--color-champagne)", background: "rgba(255,255,255,.45)" }} aria-label="Lọc theo khoảng giá">
+          <div className="flex flex-wrap justify-between gap-2 mb-3">
+            <label className="inline-flex items-center gap-2 text-sm cursor-pointer" style={{ fontFamily: "var(--font-body)" }}>
+              <input type="checkbox" checked={priceFilterEnabled} onChange={(e) => setPriceFilterEnabled(e.target.checked)} aria-label="Bật lọc theo khoảng giá" />
+              Khoảng giá
+            </label>
+            <span className="text-sm" style={{ color: "var(--color-charcoal)", fontFamily: "var(--font-body)", opacity: priceFilterEnabled ? 1 : 0.5 }}>{priceFilterEnabled ? `${formatPrice(minPrice)} – ${formatPrice(maxPrice)}` : "Không áp dụng"}</span>
+          </div>
+          <div className={`relative h-8 flex items-center ${priceFilterEnabled ? "" : "opacity-40"}`}>
+            <div className="absolute left-0 right-0 h-1 rounded-full" style={{ background: "var(--color-champagne)" }} />
+            <div
+              className="absolute h-1 rounded-full"
+              style={{
+                left: `${((minPrice - MIN_PRICE) / (MAX_PRICE - MIN_PRICE)) * 100}%`,
+                right: `${100 - ((maxPrice - MIN_PRICE) / (MAX_PRICE - MIN_PRICE)) * 100}%`,
+                background: "var(--color-charcoal)",
+              }}
+            />
+            <input
+              type="range" min={MIN_PRICE} max={MAX_PRICE} step={1000} value={minPrice}
+              onChange={(e) => setMinPrice(Math.min(Number(e.target.value), maxPrice))}
+              className="price-range-thumb absolute inset-0 w-full"
+              disabled={!priceFilterEnabled}
+              aria-label="Giá thấp nhất"
+            />
+            <input
+              type="range" min={MIN_PRICE} max={MAX_PRICE} step={1000} value={maxPrice}
+              onChange={(e) => setMaxPrice(Math.max(Number(e.target.value), minPrice))}
+              className="price-range-thumb absolute inset-0 w-full"
+              disabled={!priceFilterEnabled}
+              aria-label="Giá cao nhất"
+            />
+            <style>{`
+              .price-range-thumb { appearance: none; -webkit-appearance: none; background: transparent; pointer-events: none; }
+              .price-range-thumb::-webkit-slider-thumb { appearance: none; -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--color-charcoal); border: 2px solid var(--color-cream); cursor: grab; pointer-events: auto; }
+              .price-range-thumb::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--color-charcoal); border: 2px solid var(--color-cream); cursor: grab; pointer-events: auto; }
+              .price-range-thumb:focus-visible::-webkit-slider-thumb { outline: 2px solid var(--color-gold); outline-offset: 2px; }
+              .price-range-thumb:focus-visible::-moz-range-thumb { outline: 2px solid var(--color-gold); outline-offset: 2px; }
+            `}</style>
+          </div>
+          <div className="flex justify-between text-xs opacity-60 mt-1" style={{ fontFamily: "var(--font-body)" }}><span>{formatPrice(MIN_PRICE)}</span><span>{formatPrice(MAX_PRICE)}</span></div>
+        </section>
 
         {loading && (
           <p className="text-center py-20 opacity-60" style={{ fontFamily: "var(--font-body)" }}>

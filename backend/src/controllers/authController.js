@@ -54,6 +54,15 @@ const login = async (req, res) => {
   }
 };
 
+const googleLogin = async (req, res) => {
+  try {
+    const result = await authService.loginWithGoogle(req.body.credential);
+    res.status(200).json({ success: true, message: "Đăng nhập Google thành công", data: result });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ success: false, message: error.message || "Lỗi server" });
+  }
+};
+
 // Lấy thông tin user đang đăng nhập
 const getMe = async (req, res) => {
   try {
@@ -67,8 +76,10 @@ const getMe = async (req, res) => {
         phone: req.user.phone,
         address: req.user.address,
         city: req.user.city,
+        ward: req.user.ward || "",
         birthdate: req.user.birthdate || "",
         gender: req.user.gender || "",
+        avatar: req.user.avatar || "",
       },
     });
   } catch (error) {
@@ -113,6 +124,7 @@ const changePassword = async (req, res) => {
 module.exports = {
   register,
   login,
+  googleLogin,
   getMe,
   updateProfile,
   changePassword,

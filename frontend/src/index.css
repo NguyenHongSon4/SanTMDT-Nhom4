@@ -14,6 +14,61 @@
   --font-body: 'Outfit', system-ui, sans-serif;
 }
 
+html[data-theme="dark"] {
+  --color-cream: #171614;
+  --color-champagne: #e8ddd0;
+  --color-gold: #d5b38c;
+  --color-charcoal: #eee8df;
+  --color-charcoal-soft: #ded7ce;
+  --color-warm-gray: #aaa198;
+  --color-mist: #211f1c;
+  color-scheme: dark;
+}
+
+html[data-theme="dark"] body {
+  background-color: var(--color-cream);
+  color: var(--color-charcoal);
+}
+
+/* Keep surfaces that used the light palette readable after the theme tokens switch. */
+html[data-theme="dark"] nav,
+html[data-theme="dark"] [style*="background: var(--color-charcoal)"],
+html[data-theme="dark"] [style*="background: #111"] {
+  background: #24221f !important;
+}
+
+html[data-theme="dark"] [style*="background: white"],
+html[data-theme="dark"] .bg-white {
+  background-color: #24221f !important;
+}
+
+html[data-theme="dark"] input:not([type="checkbox"]):not([type="range"]),
+html[data-theme="dark"] textarea,
+html[data-theme="dark"] select {
+  background-color: #211f1c;
+  color: var(--color-charcoal);
+  border-color: var(--color-champagne);
+}
+
+html[data-theme="dark"] input::placeholder,
+html[data-theme="dark"] textarea::placeholder {
+  color: #aaa198;
+}
+
+html[data-theme="dark"] .text-black,
+html[data-theme="dark"] .text-gray-900,
+html[data-theme="dark"] .text-gray-800,
+html[data-theme="dark"] .text-gray-700 {
+  color: #eee8df;
+}
+
+html[data-theme="dark"] .bg-gray-50,
+html[data-theme="dark"] .bg-gray-100,
+html[data-theme="dark"] .bg-slate-50,
+html[data-theme="dark"] .bg-slate-100 {
+  background-color: #211f1c;
+}
+
 * {
   box-sizing: border-box;
 }

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import type { CartItem, Page, AppUser, Order } from "../App";
 import { createOrder } from "../services/orderService";
+import AddressLocationFields from "../components/AddressLocationFields";
 import {
   validateCoupon,
   fetchActiveCoupons,
@@ -15,15 +16,7 @@ interface CheckoutPageProps {
 }
 
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "₫";
-const cities = [
-  "TP.HCM",
-  "Hà Nội",
-  "Đà Nẵng",
-  "Cần Thơ",
-  "Huế",
-  "Nha Trang",
-  "Hải Phòng",
-];
+
 
 interface AppliedPromo {
   code: string;
@@ -468,6 +461,7 @@ export default function CheckoutPage({
   const [phone, setPhone] = useState(user?.phone ?? "");
   const [address, setAddress] = useState(user?.address ?? "");
   const [city, setCity] = useState(user?.city ?? "TP.HCM");
+  const [ward, setWard] = useState(user?.ward ?? "");
   const [note, setNote] = useState("");
   const [payment, setPayment] = useState<"cod" | "transfer" | "card">("cod");
   const [transferInfo, setTransferInfo] = useState<{ bankCode: string; account: string; accountName: string; reference: string; amount: number; qrUrl: string } | null>(null);
@@ -488,6 +482,7 @@ export default function CheckoutPage({
       setPhone(user.phone || "");
       setAddress(user.address || "");
       setCity(user.city || "TP.HCM");
+      setWard(user.ward || "");
     }
   }, [user]);
 
@@ -540,6 +535,8 @@ export default function CheckoutPage({
     if (!name.trim()) e.name = "Vui lòng nhập họ tên";
     if (!phone.trim()) e.phone = "Vui lòng nhập số điện thoại";
     if (!address.trim()) e.address = "Vui lòng nhập địa chỉ";
+    if (!city.trim()) e.city = "Vui lòng chọn tỉnh/thành phố";
+    if (!ward.trim()) e.ward = "Vui lòng chọn phường/xã";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -552,6 +549,7 @@ export default function CheckoutPage({
         phone,
         shippingAddress: address,
         shippingCity: city,
+        shippingWard: ward,
         paymentMethod: payment,
         note,
         shippingFee: shipping,
@@ -574,6 +572,7 @@ export default function CheckoutPage({
         total: data.total,
         address: data.shippingAddress,
         city: data.shippingCity,
+        ward: data.shippingWard,
         phone: data.phone,
         payment: data.paymentMethod,
         paymentStatus: data.paymentStatus,
@@ -912,30 +911,14 @@ export default function CheckoutPage({
                       onChange={(e) => setAddress(e.target.value)}
                       style={inputStyle}
                       className={inputCls}
+                      placeholder="Số nhà, tên đường"
                     />
-                    {errors.address && (
-                      <p className="text-xs mt-1" style={{ color: "#c0392b" }}>
-                        {errors.address}
-                      </p>
-                    )}
+                    {errors.address && <p className="text-xs mt-1" style={{ color: "#c0392b" }}>{errors.address}</p>}
                   </div>
-                  <div>
-                    <label className="block text-xs tracking-widest uppercase mb-2">
-                      Tỉnh / Thành phố
-                    </label>
-                    <select
-                      value={city}
-                      onChange={(e) => setCity(e.target.value)}
-                      style={inputStyle}
-                      className={inputCls}
-                    >
-                      {cities.map((c) => (
-                        <option key={c} value={c}>
-                          {c}
-                        </option>
-                      ))}
-                    </select>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <AddressLocationFields province={city} ward={ward} onProvinceChange={setCity} onWardChange={setWard} inputClassName={inputCls} inputStyle={inputStyle} />
                   </div>
+                  {(errors.city || errors.ward) && <p className="text-xs" style={{ color: "#c0392b" }}>{errors.ward || errors.city}</p>}
                   <div>
                     <label className="block text-xs tracking-widest uppercase mb-2">
                       Ghi chú

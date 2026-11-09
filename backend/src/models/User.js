@@ -17,10 +17,11 @@ const userSchema = new mongoose.Schema(
     },
     password: {
       type: String,
-      required: [true, "Vui lòng nhập mật khẩu"],
+      required: [function () { return !this.googleId; }, "Vui lòng nhập mật khẩu"],
       minlength: [6, "Mật khẩu phải có ít nhất 6 ký tự"],
       select: false, // không trả về password khi query
     },
+    googleId: { type: String, unique: true, sparse: true, select: false },
     role: {
       type: String,
       enum: ["customer", "admin"],
@@ -38,6 +39,10 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    ward: {
+      type: String,
+      default: "",
+    },
     isActive: {
       type: Boolean,
       default: true,
@@ -50,6 +55,7 @@ const userSchema = new mongoose.Schema(
       enum: ["female", "male", "other", ""],
       default: "",
     },
+    avatar: { type: String, default: "" },
   },
   {
     timestamps: true, // tự tạo createdAt, updatedAt

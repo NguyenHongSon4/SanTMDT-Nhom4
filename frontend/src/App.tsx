@@ -29,6 +29,8 @@ import { getMe, logout } from "./services/authService";
 import AdminBrands from "./pages/admin/AdminBrands";
 import AdminRevenue from "./pages/admin/AdminRevenue";
 import SupportInfoPage from "./pages/SupportInfoPage";
+import FeedbackPage from "./pages/FeedbackPage";
+import { fetchProductById } from "./services/productService";
 
 
 export type Page =
@@ -52,7 +54,9 @@ export type Page =
   | "admin-categories"
   | "admin-promotions"
   | "admin-reviews"
-  | "admin-brands";
+  | "admin-brands"
+  | "feedback"
+  | "admin-feedback";
 
 export interface CartItem {
   id: string;
@@ -80,6 +84,33 @@ export interface Product {
   isBestseller?: boolean;
 }
 
+const NAVIGATION_STORAGE_KEY = "lumiere-current-navigation";
+const validPages = new Set<Page>([
+  "home", "products", "detail", "cart", "login", "checkout", "orders", "profile",
+  "return-policy", "buying-guide", "brand-story", "certifications", "admin-dashboard",
+  "admin-revenue", "admin-products", "admin-orders", "admin-users", "admin-categories",
+  "admin-promotions", "admin-reviews", "admin-brands", "feedback", "admin-feedback",
+]);
+
+function readSavedNavigation(): { page: Page; selectedProduct: Product | null } {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(NAVIGATION_STORAGE_KEY) || "null");
+    if (!saved || !validPages.has(saved.page)) return { page: "home", selectedProduct: null };
+    if (saved.page === "detail" && !saved.selectedProduct) return { page: "home", selectedProduct: null };
+    return { page: saved.page, selectedProduct: saved.selectedProduct || null };
+  } catch {
+    return { page: "home", selectedProduct: null };
+  }
+}
+
+function saveNavigation(page: Page, selectedProduct: Product | null) {
+  try {
+    sessionStorage.setItem(NAVIGATION_STORAGE_KEY, JSON.stringify({ page, selectedProduct }));
+  } catch {
+    // Keep navigation working even when browser storage is unavailable.
+  }
+}
+
 export interface AppUser {
   name: string;
   email: string;
@@ -87,8 +118,10 @@ export interface AppUser {
   phone?: string;
   address?: string;
   city?: string;
+  ward?: string;
   birthdate?: string;
   gender?: string;
+  avatar?: string;
 }
 
 export interface Order {
@@ -100,6 +133,7 @@ export interface Order {
   total: number;
   address: string;
   city: string;
+  ward?: string;
   phone: string;
   payment: "cod" | "transfer" | "card";
   paymentStatus?: "unpaid" | "pending" | "paid" | "failed" | "refunded";
@@ -112,8 +146,14 @@ export interface Order {
 }
 
 export default function App() {
-  const [page, setPage] = useState<Page>("home");
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [initialNavigation] = useState(readSavedNavigation);
+  const [page, setPage] = useState<Page>(initialNavigation.page);
+  const [openReviewOnDetail, setOpenReviewOnDetail] = useState(false);
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    const saved = localStorage.getItem("lumiere-theme");
+    return saved === "dark" ? "dark" : "light";
+  });
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(initialNavigation.selectedProduct);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [user, setUser] = useState<AppUser | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -123,6 +163,7 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     if (params.has("paymentResult")) {
       setPage("orders");
+      saveNavigation("orders", initialNavigation.selectedProduct);
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, []);
@@ -137,11 +178,20 @@ export default function App() {
           phone: u.phone,
           address: u.address,
           city: u.city,
+          ward: u.ward,
           birthdate: u.birthdate,
           gender: u.gender,
+          avatar: u.avatar,
         });
       }
     });
+  }, []);
+
+  useEffect(() => {
+    if (initialNavigation.page !== "detail" || !initialNavigation.selectedProduct) return;
+    fetchProductById(initialNavigation.selectedProduct.id)
+      .then(setSelectedProduct)
+      .catch(() => {});
   }, []);
   
   useEffect(() => {
@@ -154,9 +204,12 @@ export default function App() {
       .catch(() => setCart([]));
   }, [user]);
 
-  const navigate = (target: Page, product?: Product) => {
+  const navigate = (target: Page, product?: Product, openReview = false) => {
+    const nextProduct = product || selectedProduct;
     if (product) setSelectedProduct(product);
+    setOpenReviewOnDetail(target === "detail" && openReview);
     setPage(target);
+    saveNavigation(target, nextProduct);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -196,7 +249,8 @@ const updateCart = async (id: string, variant: string, qty: number) => {
   logout();
   setUser(null);
   setCart([]);
-  setPage("login"); // hoặc "home" nếu muốn về trang chủ
+  setPage("login");
+  saveNavigation("login", selectedProduct);
 };
 
   const handleUpdateUser = (updates: Partial<AppUser>) => {
@@ -217,6 +271,11 @@ const updateCart = async (id: string, variant: string, qty: number) => {
   const cartCount = cart.reduce((s, i) => s + i.qty, 0);
   const isAdminPage = page.startsWith("admin");
 
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem("lumiere-theme", theme);
+  }, [theme]);
+
   const adminContent = (() => {
     if (page === "admin-dashboard") return <AdminDashboard navigate={navigate} />;
     if (page === "admin-revenue") return <AdminRevenue />;
@@ -227,12 +286,13 @@ const updateCart = async (id: string, variant: string, qty: number) => {
     if (page === "admin-promotions") return <AdminPromotions />;
     if (page === "admin-reviews") return <AdminReviews />;
     if (page === "admin-brands") return <AdminBrands />;
+    if (page === "admin-feedback") return user ? <FeedbackPage user={user} navigate={navigate} /> : null;
     return null;
   })();
 
   return (
     <div className="min-h-screen" style={{ background: "var(--color-cream)", fontFamily: "var(--font-body)" }}>
-      <Navbar page={page} navigate={navigate} cartCount={cartCount} user={user} onLogout={handleLogout} />
+      <Navbar page={page} navigate={navigate} cartCount={cartCount} user={user} onLogout={handleLogout} theme={theme} onToggleTheme={() => setTheme((current) => current === "light" ? "dark" : "light")} />
 
       {isAdminPage ? (
         <AdminLayout page={page} navigate={navigate} onLogout={handleLogout}>
@@ -243,7 +303,7 @@ const updateCart = async (id: string, variant: string, qty: number) => {
           {page === "home" && <HomePage navigate={navigate} />}
           {page === "products" && <ProductsPage navigate={navigate} />}
           {page === "detail" && selectedProduct && (
-            <ProductDetailPage product={selectedProduct} navigate={navigate} addToCart={addToCart} user={user} />
+            <ProductDetailPage product={selectedProduct} navigate={navigate} addToCart={addToCart} user={user} openReviewOnLoad={openReviewOnDetail} />
           )}
           {page === "cart" && <CartPage cart={cart} updateCart={updateCart} navigate={navigate} />}
           {page === "login" && <LoginPage navigate={navigate} onLogin={handleLogin} />}
@@ -251,6 +311,7 @@ const updateCart = async (id: string, variant: string, qty: number) => {
             <CheckoutPage cart={cart} navigate={navigate} user={user} onOrderPlaced={handleOrderPlaced} />
           )}
           {page === "orders" && <OrdersPage navigate={navigate} />}
+          {page === "feedback" && user && <FeedbackPage user={user} navigate={navigate} />}
           {(page === "return-policy" || page === "buying-guide" || page === "brand-story" || page === "certifications") && (
             <SupportInfoPage page={page} navigate={navigate} />
           )}

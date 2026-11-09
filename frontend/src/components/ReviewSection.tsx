@@ -13,6 +13,7 @@ interface ReviewSectionProps {
   user: AppUser | null;
   navigate: (p: Page) => void;
   onStatsChange?: (avg: number, count: number) => void;
+  openFormOnLoad?: boolean;
 }
 
 function StarSelector({
@@ -76,10 +77,11 @@ export default function ReviewSection({
   user,
   navigate,
   onStatsChange,
+  openFormOnLoad = false,
 }: ReviewSectionProps) {
   const [reviews, setReviews] = useState<ReviewView[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
+  const [showForm, setShowForm] = useState(openFormOnLoad);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
   const [files, setFiles] = useState<File[]>([]);
@@ -105,6 +107,14 @@ export default function ReviewSection({
   useEffect(() => {
     load();
   }, [productId]);
+
+  useEffect(() => {
+    if (!openFormOnLoad) return;
+    const timer = window.setTimeout(() => {
+      document.getElementById("product-reviews")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+    return () => window.clearTimeout(timer);
+  }, [openFormOnLoad, productId]);
 
   const onPickFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
     const list = Array.from(e.target.files || []).slice(0, 3);
@@ -152,8 +162,9 @@ export default function ReviewSection({
 
   return (
     <div
+      id="product-reviews"
       style={{ borderTop: "1px solid var(--color-champagne)" }}
-      className="pt-12 mt-4"
+      className="pt-12 mt-4 scroll-mt-24"
     >
       <div className="flex items-start justify-between mb-10 flex-wrap gap-3">
         <div>

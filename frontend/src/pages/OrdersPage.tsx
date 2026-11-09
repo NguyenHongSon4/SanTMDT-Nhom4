@@ -6,9 +6,11 @@ import {
   cancelMyOrder,
   type OrderFromApi,
 } from "../services/orderService";
+import type { Product } from "../App";
+import { fetchProductById } from "../services/productService";
 
 interface OrdersPageProps {
-  navigate: (p: Page) => void;
+  navigate: (p: Page, product?: Product, openReview?: boolean) => void;
 }
 
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "₫";
@@ -32,6 +34,7 @@ function mapOrder(o: OrderFromApi): Order {
     total: o.total,
     address: o.shippingAddress,
     city: o.shippingCity,
+    ward: o.shippingWard,
     phone: o.phone,
     payment: o.paymentMethod,
     paymentStatus: o.paymentStatus || (o.paymentMethod === "cod" ? "unpaid" : "pending"),
@@ -90,6 +93,7 @@ export default function OrdersPage({ navigate }: OrdersPageProps) {
   const [notice, setNotice] = useState<{ type: "success" | "pending"; text: string } | null>(null);
   const [filterStatus, setFilterStatus] = useState("all");
   const [cancelling, setCancelling] = useState(false);
+  const [reviewingProductId, setReviewingProductId] = useState<string | null>(null);
 
   const loadOrders = async (showLoading = true) => {
     if (showLoading) setLoading(true);
@@ -167,6 +171,18 @@ export default function OrdersPage({ navigate }: OrdersPageProps) {
       alert(err.message || "Hủy đơn thất bại");
     } finally {
       setCancelling(false);
+    }
+  };
+
+  const reviewProduct = async (productId: string) => {
+    setReviewingProductId(productId);
+    try {
+      const product = await fetchProductById(productId);
+      navigate("detail", product, true);
+    } catch (err: any) {
+      alert(err.message || "Không tải được sản phẩm để đánh giá");
+    } finally {
+      setReviewingProductId(null);
     }
   };
 
@@ -489,15 +505,32 @@ export default function OrdersPage({ navigate }: OrdersPageProps) {
                                 {item.qty} sản phẩm
                               </p>
                             </div>
-                            <p
-                              style={{
-                                color: "var(--color-charcoal)",
-                                fontFamily: "var(--font-body)",
-                              }}
-                              className="text-sm font-medium"
-                            >
-                              {fmt(item.price * item.qty)}
-                            </p>
+                            <div className="flex flex-col items-end gap-2">
+                              <p
+                                style={{
+                                  color: "var(--color-charcoal)",
+                                  fontFamily: "var(--font-body)",
+                                }}
+                                className="text-sm font-medium"
+                              >
+                                {fmt(item.price * item.qty)}
+                              </p>
+                              {order.status === "completed" && (
+                                <button
+                                  type="button"
+                                  onClick={() => void reviewProduct(item.id)}
+                                  disabled={reviewingProductId === item.id}
+                                  style={{
+                                    color: "var(--color-charcoal)",
+                                    border: "1px solid var(--color-champagne)",
+                                    fontFamily: "var(--font-body)",
+                                  }}
+                                  className="px-3 py-1.5 text-[10px] tracking-widest uppercase hover:bg-[var(--color-mist)] disabled:opacity-50"
+                                >
+                                  {reviewingProductId === item.id ? "Đang mở..." : "Đánh giá"}
+                                </button>
+                              )}
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -513,7 +546,7 @@ export default function OrdersPage({ navigate }: OrdersPageProps) {
                           >
                             Giao đến:{" "}
                             <span style={{ color: "var(--color-charcoal)" }}>
-                              {order.address}, {order.city}
+                              {[order.address, order.ward, order.city].filter(Boolean).join(", ")}
                             </span>
                           </p>
                           <p

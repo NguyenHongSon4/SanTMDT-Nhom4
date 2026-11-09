@@ -1,5 +1,57 @@
 ﻿const User = require("../models/User");
 const jwt = require("jsonwebtoken");
+const GOOGLE_TOKEN_INFO_URL = "https://oauth2.googleapis.com/tokeninfo";
+
+const loginWithGoogle = async (credential) => {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  if (!clientId) {
+    const error = new Error("Đăng nhập Google chưa được cấu hình");
+    error.statusCode = 503;
+    throw error;
+  }
+  if (typeof credential !== "string" || credential.length > 10000) {
+    const error = new Error("Google credential không hợp lệ");
+    error.statusCode = 400;
+    throw error;
+  }
+  let claims;
+  try {
+    const response = await fetch(`${GOOGLE_TOKEN_INFO_URL}?id_token=${encodeURIComponent(credential)}`);
+    if (!response.ok) throw new Error("Invalid credential");
+    claims = await response.json();
+  } catch {
+    const error = new Error("Không thể xác minh tài khoản Google");
+    error.statusCode = 401;
+    throw error;
+  }
+  if (claims.aud !== clientId || !["accounts.google.com", "https://accounts.google.com"].includes(claims.iss) || claims.email_verified !== "true" || !claims.sub || !claims.email) {
+    const error = new Error("Tài khoản Google không hợp lệ hoặc email chưa được xác minh");
+    error.statusCode = 401;
+    throw error;
+  }
+  let user = await User.findOne({ googleId: claims.sub });
+  if (!user) {
+    user = await User.findOne({ email: claims.email.toLowerCase() }).select("+googleId");
+    if (user) {
+      if (user.googleId && user.googleId !== claims.sub) {
+        const error = new Error("Email này đã liên kết với tài khoản Google khác");
+        error.statusCode = 409;
+        throw error;
+      }
+      user.googleId = claims.sub;
+      if (!user.avatar && claims.picture) user.avatar = claims.picture;
+      await user.save();
+    } else {
+      user = await User.create({ name: claims.name || claims.email.split("@")[0], email: claims.email, googleId: claims.sub, avatar: claims.picture || "", role: "customer" });
+    }
+  }
+  if (!user.isActive) {
+    const error = new Error("Tài khoản đã bị vô hiệu hóa");
+    error.statusCode = 403;
+    throw error;
+  }
+  return { user: { id: user._id, name: user.name, email: user.email, role: user.role, phone: user.phone || "", address: user.address || "", city: user.city || "", ward: user.ward || "", birthdate: user.birthdate || "", gender: user.gender || "", avatar: user.avatar || "" }, token: generateToken(user._id) };
+};
 
 // Tạo JWT token
 const generateToken = (userId) => {
@@ -35,8 +87,10 @@ const register = async ({ name, email, password }) => {
       phone: user.phone || "",
       address: user.address || "",
       city: user.city || "",
+      ward: user.ward || "",
       birthdate: user.birthdate || "",
     gender: user.gender || "",
+      avatar: user.avatar || "",
     },
     token,
   };
@@ -76,8 +130,10 @@ const login = async ({ email, password }) => {
       phone: user.phone || "",
       address: user.address || "",
       city: user.city || "",
+      ward: user.ward || "",
       birthdate: user.birthdate || "",
     gender: user.gender || "",
+      avatar: user.avatar || "",
     },
     token,
   };
@@ -95,8 +151,10 @@ const updateProfile = async (userId, data) => {
   if (data.phone !== undefined) user.phone = data.phone;
   if (data.address !== undefined) user.address = data.address;
   if (data.city !== undefined) user.city = data.city;
+  if (data.ward !== undefined) user.ward = data.ward;
   if (data.birthdate !== undefined) user.birthdate = data.birthdate;
   if (data.gender !== undefined) user.gender = data.gender;
+  if (data.avatar !== undefined) user.avatar = data.avatar;
 
   await user.save();
 
@@ -108,8 +166,10 @@ const updateProfile = async (userId, data) => {
     phone: user.phone || "",
     address: user.address || "",
     city: user.city || "",
+    ward: user.ward || "",
     birthdate: user.birthdate || "",
     gender: user.gender || "",
+    avatar: user.avatar || "",
   };
 };
 
@@ -148,6 +208,7 @@ const changePassword = async (userId, { currentPassword, newPassword }) => {
 module.exports = {
   register,
   login,
+  loginWithGoogle,
   updateProfile,
   changePassword,
 };

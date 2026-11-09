@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import type { Page, AppUser } from "../App";
+import { getAvatarUrl } from "../services/authService";
 
 interface NavbarProps {
   page: Page;
@@ -7,9 +8,11 @@ interface NavbarProps {
   cartCount: number;
   user: AppUser | null;
   onLogout: () => void;
+  theme: "light" | "dark";
+  onToggleTheme: () => void;
 }
 
-export default function Navbar({ page, navigate, cartCount, user, onLogout }: NavbarProps) {
+export default function Navbar({ page, navigate, cartCount, user, onLogout, theme, onToggleTheme }: NavbarProps) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -61,6 +64,17 @@ export default function Navbar({ page, navigate, cartCount, user, onLogout }: Na
 
         {/* Right side */}
         <div className="flex items-center gap-5">
+          <button
+            type="button"
+            onClick={onToggleTheme}
+            aria-label={theme === "light" ? "Bật giao diện tối" : "Bật giao diện sáng"}
+            title={theme === "light" ? "Giao diện tối" : "Giao diện sáng"}
+            style={{ color: "var(--color-gold)" }}
+            className="flex items-center gap-1.5 text-xs transition-opacity hover:opacity-70"
+          >
+            <span aria-hidden="true" className="text-base">{theme === "light" ? "☾" : "☀"}</span>
+            <span className="hidden sm:inline">{theme === "light" ? "Tối" : "Sáng"}</span>
+          </button>
           {/* Cart (customer only) */}
           {user?.role !== "admin" && (
             <button
@@ -91,7 +105,7 @@ export default function Navbar({ page, navigate, cartCount, user, onLogout }: Na
                 className="flex items-center gap-2 hover:opacity-70 transition-opacity"
               >
                 <div style={{ width: "30px", height: "30px", background: "rgba(201,168,130,0.2)", border: "1px solid var(--color-gold)", borderRadius: "50%" }} className="flex items-center justify-center">
-                  <span style={{ color: "var(--color-gold)", fontFamily: "var(--font-display)", fontSize: "12px" }}>{user.name[0]}</span>
+                  {user.avatar ? <img src={getAvatarUrl(user.avatar)} alt="" className="w-full h-full rounded-full object-cover" /> : <span style={{ color: "var(--color-gold)", fontFamily: "var(--font-display)", fontSize: "12px" }}>{user.name[0]}</span>}
                 </div>
                 <span style={{ fontFamily: "var(--font-body)" }} className="text-xs tracking-widest uppercase hidden sm:block">{user.name.split(" ").slice(-1)[0]}</span>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ transform: userMenuOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
@@ -195,6 +209,16 @@ export default function Navbar({ page, navigate, cartCount, user, onLogout }: Na
                           </svg>
                         ),
                       },
+                      {
+                        label: "Góp Ý Khách Hàng",
+                        page: "admin-feedback" as Page,
+                        icon: (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                            <path d="M21 11.5a8.5 8.5 0 0 1-12.7 7.4L3 21l2.1-5.3A8.5 8.5 0 1 1 21 11.5Z" />
+                            <path d="M8 11h8M8 15h5" />
+                          </svg>
+                        ),
+                      },
                     ] as const
                   ).map((item) => (
                     <button
@@ -220,6 +244,7 @@ export default function Navbar({ page, navigate, cartCount, user, onLogout }: Na
                     [
                       { label: "Hồ Sơ", page: "profile" as Page },
                       { label: "Đơn Hàng", page: "orders" as Page },
+                      { label: "Góp Ý / Hỗ Trợ", page: "feedback" as Page },
                     ].map((item) => (
                       <button
                         key={item.page}

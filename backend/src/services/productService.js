@@ -36,7 +36,8 @@ const getAllProducts = async (query = {}) => {
   let sort = { createdAt: -1 };
   if (query.sort === "price_asc") sort = { price: 1 };
   if (query.sort === "price_desc") sort = { price: -1 };
-  if (query.sort === "name") sort = { name: 1 };
+  if (query.sort === "name" || query.sort === "name_asc") sort = { name: 1 };
+  if (query.sort === "name_desc") sort = { name: -1 };
 
   const products = await Product.find(filter)
     .populate("categoryId", "name")

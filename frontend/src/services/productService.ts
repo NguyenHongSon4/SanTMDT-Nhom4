@@ -16,6 +16,8 @@ interface ApiProduct {
   isBestseller?: boolean;
   ingredients?: string;
   tags?: string[];
+  rating?: number;
+  reviewsCount?: number;
 }
 
 interface ProductsResponse {
@@ -50,8 +52,8 @@ function mapProduct(p: ApiProduct): Product {
         : "https://via.placeholder.com/400x500?text=LUMIERE",
     category: categoryName || "Khác",
     tags: p.tags || [],
-    rating: 0,
-    reviews: 0,
+    rating: Number(p.rating) || 0,
+    reviews: Number(p.reviewsCount) || 0,
     description: p.description || "",
     ingredients: p.ingredients || "",
     isNew: p.isNewArrival,

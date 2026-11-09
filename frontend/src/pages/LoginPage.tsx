@@ -1,6 +1,10 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Page, AppUser } from "../App";
-import { login, register } from "../services/authService";
+import { login, loginWithGoogle, register } from "../services/authService";
+
+declare global {
+  interface Window { google?: { accounts: { id: { initialize: (options: any) => void; renderButton: (element: HTMLElement, options: any) => void } } } }
+}
 
 interface LoginPageProps {
   navigate: (p: Page) => void;
@@ -23,6 +27,35 @@ export default function LoginPage({ navigate, onLogin }: LoginPageProps) {
   const [regPhone, setRegPhone] = useState("");
   const [regSuccess, setRegSuccess] = useState(false);
   const [regError, setRegError] = useState("");
+  const googleButton = useRef<HTMLDivElement>(null);
+  const [googleError, setGoogleError] = useState("");
+  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
+
+  useEffect(() => {
+    if (!clientId || !googleButton.current) return;
+    const render = () => {
+      if (!window.google || !googleButton.current) return;
+      window.google.accounts.id.initialize({
+        client_id: clientId,
+        callback: async ({ credential }: { credential: string }) => {
+          setLoading(true); setGoogleError("");
+          try {
+            const data = await loginWithGoogle(credential);
+            onLogin({ name: data.user.name, email: data.user.email, role: data.user.role, phone: data.user.phone, address: data.user.address, city: data.user.city, ward: data.user.ward, birthdate: data.user.birthdate, gender: data.user.gender, avatar: data.user.avatar });
+            navigate(data.user.role === "admin" ? "admin-dashboard" : "home");
+          } catch (err: any) { setGoogleError(err.message || "Đăng nhập Google thất bại."); }
+          finally { setLoading(false); }
+        },
+      });
+      window.google.accounts.id.renderButton(googleButton.current, { theme: "outline", size: "large", shape: "rectangular", text: "continue_with", width: 400, locale: "vi" });
+    };
+    if (window.google) render();
+    else {
+      const script = document.querySelector<HTMLScriptElement>('script[src="https://accounts.google.com/gsi/client"]');
+      script?.addEventListener("load", render);
+      return () => script?.removeEventListener("load", render);
+    }
+  }, [clientId]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,8 +70,10 @@ export default function LoginPage({ navigate, onLogin }: LoginPageProps) {
         phone: data.user.phone,
         address: data.user.address,
         city: data.user.city,
+        ward: data.user.ward,
         birthdate: data.user.birthdate,
         gender: data.user.gender,
+        avatar: data.user.avatar,
       });
       navigate(data.user.role === "admin" ? "admin-dashboard" : "home");
     } catch (err: any) {
@@ -75,7 +110,10 @@ export default function LoginPage({ navigate, onLogin }: LoginPageProps) {
           phone: data.user.phone,
           address: data.user.address,
           city: data.user.city,
+          ward: data.user.ward,
           birthdate: data.user.birthdate,
+          gender: data.user.gender,
+          avatar: data.user.avatar,
         });
         navigate("home");
       }, 1000);
@@ -126,6 +164,12 @@ export default function LoginPage({ navigate, onLogin }: LoginPageProps) {
             </button>
           ))}
         </div>
+
+        {clientId && <div className="mb-5">
+          <div ref={googleButton} className="flex justify-center" />
+          {googleError && <p className="mt-2 text-center text-sm" style={{ color: "#c0392b" }}>{googleError}</p>}
+          <div className="flex items-center gap-3 my-5 text-xs" style={{ color: "var(--color-warm-gray)" }}><span className="h-px flex-1" style={{ background: "var(--color-champagne)" }} />HOẶC<span className="h-px flex-1" style={{ background: "var(--color-champagne)" }} /></div>
+        </div>}
 
         {tab === "login" && (
           <form onSubmit={handleLogin} className="space-y-4">

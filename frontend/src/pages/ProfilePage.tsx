@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { Page, AppUser } from "../App";
-import { updateProfile, changePassword } from "../services/authService";
+import { updateProfile, changePassword, uploadAvatar, getAvatarUrl } from "../services/authService";
+import AddressLocationFields from "../components/AddressLocationFields";
 
 interface ProfilePageProps {
   user: AppUser;
@@ -9,13 +10,47 @@ interface ProfilePageProps {
   onUpdateUser: (updates: Partial<AppUser>) => void;
 }
 
-const cities = ["TP.HCM", "Hà Nội", "Đà Nẵng", "Cần Thơ", "Huế", "Nha Trang", "Hải Phòng"];
 
 export default function ProfilePage({ user, navigate, onLogout, onUpdateUser }: ProfilePageProps) {
   const [tab, setTab] = useState<"info" | "address" | "password">("info");
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [avatarPreview, setAvatarPreview] = useState("");
+  const [avatarError, setAvatarError] = useState("");
+  const [avatarSaving, setAvatarSaving] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => () => {
+    if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+  }, [avatarPreview]);
+
+  const handleAvatarSelected = async (file?: File) => {
+    if (!file) return;
+    setAvatarError("");
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setAvatarError("Vui lòng chọn ảnh JPG, PNG hoặc WEBP.");
+      return;
+    }
+    if (file.size > 3 * 1024 * 1024) {
+      setAvatarError("Ảnh không được vượt quá 3 MB.");
+      return;
+    }
+
+    const preview = URL.createObjectURL(file);
+    setAvatarPreview(preview);
+    setAvatarSaving(true);
+    try {
+      const updated = await uploadAvatar(file);
+      onUpdateUser({ avatar: updated.avatar });
+      setAvatarPreview("");
+    } catch (err: any) {
+      setAvatarError(err.message || "Không thể cập nhật ảnh đại diện.");
+    } finally {
+      setAvatarSaving(false);
+      if (avatarInputRef.current) avatarInputRef.current.value = "";
+    }
+  };
 
   const [name, setName] = useState(user.name);
   const [phone, setPhone] = useState(user.phone ?? "");
@@ -24,6 +59,7 @@ export default function ProfilePage({ user, navigate, onLogout, onUpdateUser }: 
 
   const [address, setAddress] = useState(user.address ?? "");
   const [city, setCity] = useState(user.city ?? "TP.HCM");
+  const [ward, setWard] = useState(user.ward ?? "");
 
   // Đồng bộ state local khi user prop được cập nhật từ bên ngoài
   useEffect(() => {
@@ -33,9 +69,8 @@ export default function ProfilePage({ user, navigate, onLogout, onUpdateUser }: 
     setGender(user.gender ?? "female");
     setAddress(user.address ?? "");
     setCity(user.city ?? "TP.HCM");
+    setWard(user.ward ?? "");
   }, [user]);
-  const [ward, setWard] = useState("");
-
   const [curPwd, setCurPwd] = useState("");
   const [newPwd, setNewPwd] = useState("");
   const [confirmPwd, setConfirmPwd] = useState("");
@@ -67,10 +102,11 @@ export default function ProfilePage({ user, navigate, onLogout, onUpdateUser }: 
   setSaving(true);
   setSaveError("");
   try {
-    const data = await updateProfile({ address, city });
+    const data = await updateProfile({ address, city, ward });
     onUpdateUser({
       address: data.address,
       city: data.city,
+      ward: data.ward,
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -142,14 +178,31 @@ const handleSavePassword = async () => {
           <div className="lg:col-span-1">
             {/* Avatar */}
             <div className="text-center mb-6">
-              <div
-                style={{ width: "80px", height: "80px", background: "var(--color-charcoal)", borderRadius: "50%", margin: "0 auto 12px" }}
-                className="flex items-center justify-center"
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={(e) => void handleAvatarSelected(e.target.files?.[0])}
+                aria-label="Chọn ảnh đại diện"
+              />
+              <button
+                type="button"
+                onClick={() => avatarInputRef.current?.click()}
+                disabled={avatarSaving}
+                aria-label="Thay đổi ảnh đại diện"
+                className="relative block overflow-hidden disabled:opacity-60"
+                style={{ width: "100px", height: "100px", background: "var(--color-charcoal)", borderRadius: "50%", margin: "0 auto 8px" }}
               >
-                <span style={{ fontFamily: "var(--font-display)", color: "var(--color-gold)" }} className="text-2xl font-normal">
-                  {user.name[0]}
-                </span>
-              </div>
+                {(avatarPreview || user.avatar) ? (
+                  <img src={avatarPreview || getAvatarUrl(user.avatar)} alt="Ảnh đại diện" className="w-full h-full object-cover" />
+                ) : (
+                  <span style={{ fontFamily: "var(--font-display)", color: "var(--color-gold)" }} className="text-2xl font-normal">{user.name[0]}</span>
+                )}
+                <span className="absolute inset-x-0 bottom-0 bg-black/60 py-1 text-[10px] text-white">{avatarSaving ? "Đang lưu…" : "Đổi ảnh"}</span>
+              </button>
+              <p style={{ color: "var(--color-warm-gray)", fontFamily: "var(--font-body)" }} className="text-[10px] mb-2">JPG, PNG hoặc WEBP · tối đa 3 MB</p>
+              {avatarError && <p role="alert" style={{ color: "#c0392b", fontFamily: "var(--font-body)" }} className="text-xs mb-2">{avatarError}</p>}
               <p style={{ fontFamily: "var(--font-display)", color: "var(--color-charcoal)" }} className="text-base font-normal">{user.name}</p>
               <p style={{ color: "var(--color-warm-gray)", fontFamily: "var(--font-body)" }} className="text-xs font-light">{user.email}</p>
             </div>
@@ -269,16 +322,7 @@ const handleSavePassword = async () => {
                     <input value={address} onChange={e => setAddress(e.target.value)} placeholder="Số nhà, đường, phường/xã, quận/huyện" style={inputStyle} className={inputCls} />
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    <div>
-                      <Label>Tỉnh / Thành Phố</Label>
-                      <select value={city} onChange={e => setCity(e.target.value)} style={inputStyle} className={inputCls + " cursor-pointer"}>
-                        {cities.map(c => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <Label>Phường / Xã</Label>
-                      <input value={ward} onChange={e => setWard(e.target.value)} placeholder="Phường Bến Nghé..." style={inputStyle} className={inputCls} />
-                    </div>
+                    <AddressLocationFields province={city} ward={ward} onProvinceChange={setCity} onWardChange={setWard} inputClassName={inputCls + " cursor-pointer"} inputStyle={inputStyle} />
                   </div>
                   <button
                     onClick={handleSaveAddress}

@@ -8,8 +8,10 @@ export interface AuthUser {
   phone?: string;
   address?: string;
   city?: string;
+  ward?: string;
   birthdate?: string;
   gender?: string;
+  avatar?: string;
 }
 
 interface AuthResponse {
@@ -31,6 +33,15 @@ export async function register(name: string, email: string, password: string) {
   const res = await apiRequest<AuthResponse>("/auth/register", {
     method: "POST",
     body: JSON.stringify({ name, email, password }),
+  });
+  setToken(res.data.token);
+  return res.data;
+}
+
+export async function loginWithGoogle(credential: string) {
+  const res = await apiRequest<AuthResponse>("/auth/google", {
+    method: "POST",
+    body: JSON.stringify({ credential }),
   });
   setToken(res.data.token);
   return res.data;
@@ -58,6 +69,7 @@ export interface ProfileUpdate {
   phone?: string;
   address?: string;
   city?: string;
+  ward?: string;
   birthdate?: string;
   gender?: string;
 }
@@ -72,6 +84,23 @@ export async function updateProfile(data: ProfileUpdate) {
     body: JSON.stringify(data),
   });
   return res.data;
+}
+
+export async function uploadAvatar(file: File): Promise<AuthUser> {
+  const formData = new FormData();
+  formData.append("avatar", file);
+  const res = await apiRequest<{ success: boolean; message: string; data: AuthUser }>(
+    "/auth/profile/avatar",
+    { method: "PUT", body: formData },
+  );
+  return res.data;
+}
+
+export function getAvatarUrl(avatar?: string) {
+  if (!avatar) return "";
+  if (/^https?:\/\//i.test(avatar)) return avatar;
+  const apiBase = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+  return `${apiBase.replace(/\/api\/?$/, "")}${avatar.startsWith("/") ? avatar : `/${avatar}`}`;
 }
 
 export async function changePassword(

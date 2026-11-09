@@ -83,14 +83,18 @@ export default function ProductCard({ product, navigate }: ProductCardProps) {
               width="10"
               height="10"
               viewBox="0 0 24 24"
-              fill={i < Math.floor(product.rating) ? "var(--color-gold)" : "none"}
+              fill={i < Math.round(product.rating) ? "var(--color-gold)" : "none"}
               stroke="var(--color-gold)"
               strokeWidth="1.5"
             >
               <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
             </svg>
           ))}
-          <span style={{ color: "var(--color-warm-gray)" }} className="text-xs ml-1">({product.reviews})</span>
+          <span style={{ color: "var(--color-warm-gray)" }} className="text-xs ml-1">
+            {product.reviews > 0
+              ? `${product.rating.toFixed(1)} (${product.reviews})`
+              : "Chưa có đánh giá (0)"}
+          </span>
         </div>
       </div>
     </div>
