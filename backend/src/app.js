@@ -11,6 +11,7 @@ const userRoutes = require("./routes/userRoutes");
 const couponRoutes = require("./routes/couponRoutes");
 const reviewRoutes = require("./routes/reviewRoutes");
 const feedbackRoutes = require("./routes/feedbackRoutes");
+const chatRoutes = require("./routes/chatRoutes");
 const path = require("path");
 const app = express();
 
@@ -39,6 +40,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/coupons", couponRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/feedback", feedbackRoutes);
+app.use("/api/chat", chatRoutes);
 
 // Xử lý route không tồn tại
 app.use((req, res) => {

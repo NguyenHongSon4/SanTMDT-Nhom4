@@ -63,7 +63,7 @@ export default function FeedbackPage({ user, navigate }: { user: AppUser; naviga
         <button onClick={() => navigate(isAdmin ? "admin-dashboard" : "home")} className="mb-6 text-sm hover:opacity-70" style={{ color: "var(--color-warm-gray)" }}>← {isAdmin ? "Quản trị" : "Trang chủ"}</button>
         <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <div><p className="mb-2 text-xs uppercase tracking-[0.25em]" style={{ color: "var(--color-gold)" }}>{isAdmin ? "Chăm sóc khách hàng" : "Lumière hỗ trợ bạn"}</p>
-            <h1 className="text-3xl md:text-4xl" style={{ color: "var(--color-charcoal)", fontFamily: "var(--font-display)" }}>{isAdmin ? "Góp ý & phản hồi" : "Góp ý & hỗ trợ"}</h1>
+            <h1 className="text-3xl md:text-4xl" style={{ color: "var(--color-charcoal)", fontFamily: "var(--font-display)" }}>{isAdmin ? "Yêu cầu hỗ trợ khách hàng" : "Góp ý & hỗ trợ"}</h1>
             <p className="mt-2 text-sm" style={{ color: "var(--color-warm-gray)" }}>{isAdmin ? `${threads.length} cuộc trao đổi · ${pendingCount} đang chờ xử lý` : "Gửi thắc mắc cho chúng tôi và theo dõi phản hồi tại đây."}</p>
           </div>
           {!isAdmin && <button onClick={() => setSelectedId("new")} className="px-5 py-3 text-xs uppercase tracking-widest" style={{ background: "var(--color-charcoal)", color: "var(--color-champagne)" }}>Gửi góp ý mới ＋</button>}

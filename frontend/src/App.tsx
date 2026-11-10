@@ -31,6 +31,7 @@ import AdminRevenue from "./pages/admin/AdminRevenue";
 import SupportInfoPage from "./pages/SupportInfoPage";
 import FeedbackPage from "./pages/FeedbackPage";
 import { fetchProductById } from "./services/productService";
+import ChatWidget from "./components/ChatWidget";
 
 
 export type Page =
@@ -293,6 +294,7 @@ const updateCart = async (id: string, variant: string, qty: number) => {
   return (
     <div className="min-h-screen" style={{ background: "var(--color-cream)", fontFamily: "var(--font-body)" }}>
       <Navbar page={page} navigate={navigate} cartCount={cartCount} user={user} onLogout={handleLogout} theme={theme} onToggleTheme={() => setTheme((current) => current === "light" ? "dark" : "light")} />
+      {!isAdminPage && <ChatWidget user={user} navigate={navigate} />}
 
       {isAdminPage ? (
         <AdminLayout page={page} navigate={navigate} onLogout={handleLogout}>

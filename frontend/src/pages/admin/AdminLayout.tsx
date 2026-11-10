@@ -100,7 +100,7 @@ const navItems: { page: Page; label: string; icon: React.ReactNode }[] = [
 },
   {
     page: "admin-feedback",
-    label: "Góp ý khách hàng",
+    label: "Yêu cầu hỗ trợ",
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
         <path d="M21 11.5a8.5 8.5 0 0 1-12.7 7.4L3 21l2.1-5.3A8.5 8.5 0 1 1 21 11.5Z" />
