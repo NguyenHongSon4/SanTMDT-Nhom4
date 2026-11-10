@@ -3,6 +3,7 @@ import { apiRequest } from "./api";
 export interface CategoryFromApi {
   _id: string;
   name: string;
+  icon?: string;
   description?: string;
   slug?: string;
   isActive?: boolean;
@@ -12,6 +13,7 @@ export interface CategoryFromApi {
 export interface CategoryView {
   id: string;
   name: string;
+  icon: string;
   description: string;
   slug: string;
   active: boolean;
@@ -23,6 +25,7 @@ function mapCategory(c: CategoryFromApi): CategoryView {
   return {
     id: c._id,
     name: c.name,
+    icon: c.icon || "🌿",
     description: c.description || "",
     slug: c.slug || "",
     active: c.isActive !== false,
@@ -51,6 +54,7 @@ export async function fetchCategoriesAdmin(): Promise<CategoryView[]> {
 export async function createCategory(payload: {
   name: string;
   description?: string;
+  icon?: string;
 }) {
   const res = await apiRequest<OneResponse>("/categories", {
     method: "POST",
@@ -61,7 +65,7 @@ export async function createCategory(payload: {
 
 export async function updateCategory(
   id: string,
-  payload: { name?: string; description?: string; isActive?: boolean }
+  payload: { name?: string; description?: string; isActive?: boolean; icon?: string }
 ) {
   const res = await apiRequest<OneResponse>(`/categories/${id}`, {
     method: "PUT",

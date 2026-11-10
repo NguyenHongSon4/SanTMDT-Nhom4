@@ -3,6 +3,10 @@ const statisticsService = require("../services/statisticsService");
 const Order = require("../models/Order");
 const vnpayService = require("../services/vnpayService");
 
+const getVnpayAvailability = (_req, res) => {
+  return res.status(200).json({ success: true, enabled: vnpayService.isConfigured() });
+};
+
 // GET /api/orders/admin/statistics (Admin)
 const getAdminStatistics = async (req, res) => {
   try {
@@ -248,6 +252,7 @@ const updatePaymentStatus = async (req, res) => {
 };
 
 module.exports = {
+  getVnpayAvailability,
   getAdminStatistics,
   createOrder,
   getMyOrders,

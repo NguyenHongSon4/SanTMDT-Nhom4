@@ -7,13 +7,7 @@ import {
   type CategoryView,
 } from "../../services/categoryService";
 
-const CATEGORY_ICONS = ["🌿", "💧", "🌸", "✨", "🧴", "☀️", "🌙", "💄", "🧖", "🫧"];
-
-function iconFor(id: string, index: number) {
-  let n = 0;
-  for (let i = 0; i < id.length; i++) n += id.charCodeAt(i);
-  return CATEGORY_ICONS[(n + index) % CATEGORY_ICONS.length];
-}
+const CATEGORY_ICONS = ["\u{1F331}", "\u{1F33F}", "\u{1F4A7}", "\u{1F338}", "\u{1F490}", "\u2728", "\u{1F9F4}", "\u2600\uFE0F", "\u{1F319}", "\u{1F484}", "\u{1F9D6}", "\u{1FAE7}", "\u{1F9FC}", "\u{1F60A}", "\u{1F440}", "\u{1F444}", "\u{1F485}", "\u{1FA9E}", "\u{1F48E}", "\u{1F31F}", "\u{1F98B}", "\u{1F34A}", "\u{1F351}", "\u{1F352}", "\u{1F30A}", "\u2601\uFE0F", "\u{1F496}", "\u{1F381}"];
 
 export default function AdminCategories() {
   const [categories, setCategories] = useState<CategoryView[]>([]);
@@ -24,7 +18,7 @@ export default function AdminCategories() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [selectedIcon, setSelectedIcon] = useState("🌿");
+  const [selectedIcon, setSelectedIcon] = useState("\u{1F331}");
   const [errors, setErrors] = useState<{ name?: string; description?: string }>({});
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -59,7 +53,7 @@ export default function AdminCategories() {
     setEditingId(null);
     setName("");
     setDescription("");
-    setSelectedIcon("🌿");
+    setSelectedIcon("\u{1F331}");
     setErrors({});
     setShowModal(true);
   };
@@ -68,7 +62,7 @@ export default function AdminCategories() {
     setEditingId(cat.id);
     setName(cat.name);
     setDescription(cat.description);
-    setSelectedIcon(iconFor(cat.id, 0));
+    setSelectedIcon(cat.icon);
     setErrors({});
     setShowModal(true);
   };
@@ -88,11 +82,13 @@ export default function AdminCategories() {
         await updateCategory(editingId, {
           name: name.trim(),
           description: description.trim(),
+          icon: selectedIcon,
         });
       } else {
         await createCategory({
           name: name.trim(),
           description: description.trim(),
+          icon: selectedIcon,
         });
       }
       setShowModal(false);
@@ -228,7 +224,7 @@ export default function AdminCategories() {
       {!loading && !error && (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
-            {filtered.map((cat, index) => (
+            {filtered.map((cat) => (
               <div
                 key={cat.id}
                 style={{
@@ -242,7 +238,7 @@ export default function AdminCategories() {
               >
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-3">
-                    <span className="text-2xl">{iconFor(cat.id, index)}</span>
+                    <span className="text-2xl">{cat.icon}</span>
                     <div>
                       <p
                         style={{
@@ -386,9 +382,10 @@ export default function AdminCategories() {
                   Biểu Tượng (chỉ giao diện)
                 </label>
                 <div className="flex flex-wrap gap-2">
-                  {CATEGORY_ICONS.map((icon) => (
+                  {CATEGORY_ICONS.map((icon, index) => (
                     <button
-                      key={icon}
+                      key={`${icon}-${index}`}
+                      aria-label={`Chọn biểu tượng ${icon}`}
                       type="button"
                       onClick={() => setSelectedIcon(icon)}
                       style={{

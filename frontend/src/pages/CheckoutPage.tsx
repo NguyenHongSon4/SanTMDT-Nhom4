@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import type { CartItem, Page, AppUser, Order } from "../App";
-import { createOrder } from "../services/orderService";
+import { createOrder, isCardPaymentEnabled } from "../services/orderService";
 import AddressLocationFields from "../components/AddressLocationFields";
 import {
   validateCoupon,
@@ -465,7 +465,7 @@ export default function CheckoutPage({
   const [note, setNote] = useState("");
   const [payment, setPayment] = useState<"cod" | "transfer" | "card">("cod");
   const [transferInfo, setTransferInfo] = useState<{ bankCode: string; account: string; accountName: string; reference: string; amount: number; qrUrl: string } | null>(null);
-  const cardPaymentEnabled = import.meta.env.VITE_CARD_PAYMENT_ENABLED === "true";
+  const [cardPaymentEnabled, setCardPaymentEnabled] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [placing, setPlacing] = useState(false);
   const [lastOrder, setLastOrder] = useState<Order | null>(null);
@@ -490,6 +490,9 @@ export default function CheckoutPage({
     fetchActiveCoupons()
       .then(setAvailableCoupons)
       .catch(() => setAvailableCoupons([]));
+    isCardPaymentEnabled()
+      .then(setCardPaymentEnabled)
+      .catch(() => setCardPaymentEnabled(false));
   }, []);
 
   const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
@@ -969,13 +972,14 @@ export default function CheckoutPage({
                     [
                       ["cod", "Thanh toán khi nhận hàng (COD)"],
                       ["transfer", "Chuyển khoản ngân hàng"],
-                      ...(cardPaymentEnabled ? [["card", "Thẻ tín dụng / ghi nợ (VNPAY)"] as const] : []),
+                      ["card", "Thẻ tín dụng / ghi nợ (VNPAY)"] as const,
                     ] as const
                   ).map(([val, label]) => (
                     <button
                       key={val}
                       type="button"
                       onClick={() => setPayment(val)}
+                      disabled={val === "card" && !cardPaymentEnabled}
                       style={{
                         width: "100%",
                         textAlign: "left",
@@ -991,6 +995,11 @@ export default function CheckoutPage({
                       {label}
                     </button>
                   ))}
+                  {!cardPaymentEnabled && (
+                    <p className="text-xs opacity-60" style={{ fontFamily: "var(--font-body)" }}>
+                      Thanh toán thẻ sẽ khả dụng sau khi cửa hàng cấu hình tài khoản VNPAY.
+                    </p>
+                  )}
                 </div>
                 <div className="flex gap-3">
                   <button

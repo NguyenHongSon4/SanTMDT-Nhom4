@@ -199,3 +199,11 @@ export async function fetchCategories(): Promise<{ id: string; name: string }[]>
   }>("/categories");
   return res.data.map((c) => ({ id: c._id, name: c.name }));
 }
+
+export async function fetchActiveCategories(): Promise<{ id: string; name: string }[]> {
+  const res = await apiRequest<{
+    success: boolean;
+    data: { _id: string; name: string }[];
+  }>("/categories?isActive=true");
+  return res.data.map((c) => ({ id: c._id, name: c.name }));
+}

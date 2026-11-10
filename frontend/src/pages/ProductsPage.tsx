@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import type { Page, Product } from "../App";
-import { fetchProducts } from "../services/productService";
+import { fetchActiveCategories, fetchProducts } from "../services/productService";
 import { fetchActiveBrands } from "../services/brandService";
 import ProductCard from "../components/ProductCard";
 
@@ -27,13 +27,16 @@ export default function ProductsPage({ navigate }: ProductsPageProps) {
   const [sort, setSort] = useState("default");
   const [search, setSearch] = useState("");
   const [brandId, setBrandId] = useState("");
+  const [categoryId, setCategoryId] = useState("");
   const [brands, setBrands] = useState<{ id: string; name: string }[]>([]);
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [priceFilterEnabled, setPriceFilterEnabled] = useState(false);
   const [minPrice, setMinPrice] = useState(MIN_PRICE);
   const [maxPrice, setMaxPrice] = useState(MAX_PRICE);
 
   useEffect(() => {
     fetchActiveBrands().then(setBrands).catch(() => setBrands([]));
+    fetchActiveCategories().then(setCategories).catch(() => setCategories([]));
   }, []);
 
   useEffect(() => {
@@ -45,6 +48,7 @@ export default function ProductsPage({ navigate }: ProductsPageProps) {
         const data = await fetchProducts({
           search: search || undefined,
           brandId: brandId || undefined,
+          categoryId: categoryId || undefined,
           minPrice: priceFilterEnabled ? minPrice : undefined,
           maxPrice: priceFilterEnabled ? maxPrice : undefined,
           sort: sort === "default" ? undefined : sort,
@@ -60,7 +64,7 @@ export default function ProductsPage({ navigate }: ProductsPageProps) {
     return () => {
       cancelled = true;
     };
-  }, [search, sort, brandId, priceFilterEnabled, minPrice, maxPrice]);
+  }, [search, sort, brandId, categoryId, priceFilterEnabled, minPrice, maxPrice]);
 
   return (
     <div style={{ paddingTop: "64px", minHeight: "100vh", background: "var(--color-cream)" }}>
@@ -114,6 +118,17 @@ export default function ProductsPage({ navigate }: ProductsPageProps) {
           >
             <option value="">Tất cả thương hiệu</option>
             {brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
+          </select>
+
+          <select
+            value={categoryId}
+            onChange={(e) => setCategoryId(e.target.value)}
+            className="px-3 py-2 text-sm bg-transparent"
+            style={{ border: "1px solid var(--color-champagne)", fontFamily: "var(--font-body)" }}
+            aria-label="Lọc theo danh mục sản phẩm"
+          >
+            <option value="">Tất cả danh mục</option>
+            {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
           </select>
         </div>
 

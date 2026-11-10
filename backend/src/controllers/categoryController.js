@@ -33,7 +33,7 @@ const getById = async (req, res) => {
 
 const create = async (req, res) => {
   try {
-    const { name, description } = req.body;
+    const { name, description, icon } = req.body;
 
     if (!name) {
       return res.status(400).json({
@@ -42,7 +42,7 @@ const create = async (req, res) => {
       });
     }
 
-    const category = await categoryService.createCategory({ name, description });
+    const category = await categoryService.createCategory({ name, description, icon });
 
     res.status(201).json({
       success: true,

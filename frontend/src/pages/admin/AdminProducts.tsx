@@ -48,6 +48,7 @@ export default function AdminProducts() {
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [lowStockOnly, setLowStockOnly] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm());
   const [saving, setSaving] = useState(false);
@@ -88,8 +89,9 @@ export default function AdminProducts() {
       p.brand.toLowerCase().includes(q);
     const matchCat =
       categoryFilter === "all" || p.categoryId === categoryFilter;
-    return matchSearch && matchCat;
+    return matchSearch && matchCat && (!lowStockOnly || p.stock < 10);
   });
+  const lowStockCount = products.filter((product) => product.stock < 10).length;
 
   const openNew = () => {
     setForm({
@@ -171,14 +173,9 @@ export default function AdminProducts() {
     e.target.value = "";
     if (!file) return;
 
-    const isCsv =
-      file.name.toLowerCase().endsWith(".csv") || file.type === "text/csv";
-
-    if (!isCsv) {
-      alert(
-        "Hiện hỗ trợ file .csv (Excel → Lưu thành CSV UTF-8).\n" +
-          "Cột gợi ý: name,price,categoryId,stock,description,image,originalPrice"
-      );
+    const extension = file.name.toLowerCase().split(".").pop();
+    if (!extension || !["csv", "xlsx", "xls"].includes(extension)) {
+      alert("Vui lòng chọn file .xlsx, .xls hoặc .csv.");
       return;
     }
 
@@ -189,70 +186,170 @@ export default function AdminProducts() {
 
     setImporting(true);
     try {
-      const text = await file.text();
-      const lines = text
-        .split(/\r?\n/)
-        .map((l) => l.trim())
-        .filter(Boolean);
+      const XLSX = await import("xlsx");
+      const workbook = XLSX.read(await file.arrayBuffer(), { type: "array" });
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = firstSheet
+        ? (XLSX.utils.sheet_to_json<unknown[]>(firstSheet, {
+            header: 1,
+            defval: "",
+            raw: false,
+          }) as unknown[][])
+        : [];
 
-      if (lines.length < 2) {
+      if (rows.length < 2) {
         alert("File trống hoặc thiếu dữ liệu.");
         return;
       }
 
-      const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
-      const idx = (key: string) => headers.indexOf(key);
+      const normalizeHeader = (value: unknown) =>
+        String(value ?? "")
+          .trim()
+          .toLocaleLowerCase("vi-VN")
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/đ/g, "d")
+          .replace(/[^a-z0-9]/g, "");
+      const headers = rows[0].map(normalizeHeader);
+      const idx = (...keys: string[]) =>
+        headers.findIndex((header) => keys.includes(header));
 
-      const nameI = idx("name");
-      const priceI = idx("price");
-      const catI = idx("categoryid");
-      const stockI = idx("stock");
-      const descI = idx("description");
-      const imageI = idx("image");
-      const origI = idx("originalprice");
+      const nameI = idx("name", "productname", "ten", "tensanpham");
+      const priceI = idx("price", "gia");
+      const categoryNameI = idx("category", "categoryname", "danhmuc", "tendanhmuc");
+      const categoryIdI = idx("categoryid");
+      const brandNameI = idx("brand", "brandname", "thuonghieu", "tenthuonghieu");
+      const brandIdI = idx("brandid");
+      const stockI = idx("stock", "quantity", "tonkho", "soluong");
+      const descI = idx("description", "mota");
+      const ingredientsI = idx("ingredients", "thanhphan");
+      const imageI = idx("image", "imageurl", "hinhanh", "anh");
+      const origI = idx("originalprice", "giagoc", "giacu");
+      const isNewI = idx("isnew", "isnewarrival", "newarrival", "hangmoi", "moi");
+      const isBestsellerI = idx("isbestseller", "bestseller", "banchay");
 
       if (nameI < 0 || priceI < 0) {
-        alert("CSV cần ít nhất cột: name, price");
+        alert("File cần có ít nhất cột name (tên sản phẩm) và price (giá).");
         return;
       }
 
       let ok = 0;
       let fail = 0;
+      const categoryNames = new Map(
+        categories.map((category) => [normalizeHeader(category.name), category.id])
+      );
+      const categoryIds = new Set(categories.map((category) => category.id));
+      const brandNames = new Map(
+        brands.map((brand) => [normalizeHeader(brand.name), brand.id])
+      );
+      const brandIds = new Set(brands.map((brand) => brand.id));
+      const failures: string[] = [];
+      const cell = (row: unknown[], column: number) =>
+        column < 0 ? "" : String(row[column] ?? "").trim();
+      const numericValue = (value: string) => {
+        const cleaned = value.replace(/[^\d.-]/g, "");
+        return cleaned ? Number(cleaned) : NaN;
+      };
+      const booleanValue = (value: string): boolean | undefined => {
+        const normalized = normalizeHeader(value);
+        if (!normalized) return false;
+        if (["true", "1", "yes", "y", "co", "x", "new", "bestseller"].includes(normalized)) return true;
+        if (["false", "0", "no", "n", "khong"].includes(normalized)) return false;
+        return undefined;
+      };
 
-      for (let i = 1; i < lines.length; i++) {
-        const cols = lines[i]
-          .split(",")
-          .map((c) => c.trim().replace(/^"|"$/g, ""));
-        const name = cols[nameI];
-        const price = Number(cols[priceI]);
-        if (!name || !price) {
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row.some((value) => String(value ?? "").trim())) continue;
+        const name = cell(row, nameI);
+        const price = numericValue(cell(row, priceI));
+        if (!name || !Number.isFinite(price) || price <= 0) {
           fail++;
+          failures.push(`Dòng ${i + 1}: thiếu tên hoặc giá không hợp lệ.`);
           continue;
         }
 
-        const categoryId = (catI >= 0 && cols[catI]) || categories[0].id;
+        const categoryName = cell(row, categoryNameI);
+        const suppliedCategoryId = cell(row, categoryIdI);
+        const categoryId = categoryName
+          ? categoryNames.get(normalizeHeader(categoryName))
+          : suppliedCategoryId && categoryIds.has(suppliedCategoryId)
+            ? suppliedCategoryId
+            : undefined;
+        if (!categoryId) {
+          fail++;
+          failures.push(
+            categoryName || suppliedCategoryId
+              ? `Dòng ${i + 1}: không tìm thấy danh mục “${categoryName || suppliedCategoryId}”.`
+              : `Dòng ${i + 1}: thiếu tên danh mục trong cột category.`
+          );
+          continue;
+        }
+
+        const brandName = cell(row, brandNameI);
+        const suppliedBrandId = cell(row, brandIdI);
+        const brandId = brandName
+          ? brandNames.get(normalizeHeader(brandName))
+          : suppliedBrandId && brandIds.has(suppliedBrandId)
+            ? suppliedBrandId
+            : undefined;
+        if ((brandName || suppliedBrandId) && !brandId) {
+          fail++;
+          failures.push(`Dòng ${i + 1}: không tìm thấy thương hiệu “${brandName || suppliedBrandId}”.`);
+          continue;
+        }
+
+        const stockText = cell(row, stockI);
+        const stock = stockText ? numericValue(stockText) : 0;
+        const originalPriceText = cell(row, origI);
+        const originalPrice = originalPriceText
+          ? numericValue(originalPriceText)
+          : undefined;
+        const isNewText = cell(row, isNewI);
+        const isBestsellerText = cell(row, isBestsellerI);
+        const isNew = booleanValue(isNewText);
+        const isBestseller = booleanValue(isBestsellerText);
+        if (
+          !Number.isFinite(stock) ||
+          stock < 0 ||
+          (originalPrice !== undefined && (!Number.isFinite(originalPrice) || originalPrice < 0)) ||
+          isNew === undefined ||
+          isBestseller === undefined
+        ) {
+          fail++;
+          failures.push(`Dòng ${i + 1}: tồn kho, giá gốc hoặc giá trị hàng mới/bán chạy không hợp lệ.`);
+          continue;
+        }
 
         try {
           await createProduct({
             name,
             price,
             categoryId,
-            stock: stockI >= 0 && cols[stockI] ? Number(cols[stockI]) : 0,
-            description: descI >= 0 ? cols[descI] || "" : "",
-            images: imageI >= 0 && cols[imageI] ? [cols[imageI]] : [],
-            originalPrice:
-              origI >= 0 && cols[origI] ? Number(cols[origI]) : null,
+            brandId: brandId ?? null,
+            stock,
+            description: cell(row, descI),
+            ingredients: cell(row, ingredientsI),
+            images: cell(row, imageI) ? [cell(row, imageI)] : [],
+            originalPrice: originalPrice ?? null,
+            isNewArrival: isNew,
+            isBestseller,
           });
           ok++;
-        } catch {
+        } catch (err: any) {
           fail++;
+          failures.push(`Dòng ${i + 1}: ${err.message || "không lưu được sản phẩm."}`);
         }
       }
 
       setImportSuccess(true);
       setTimeout(() => setImportSuccess(false), 3000);
       await load();
-      alert(`Import xong: ${ok} thành công, ${fail} lỗi.`);
+      alert(
+        `Import xong: ${ok} thành công, ${fail} lỗi.` +
+          (failures.length ? `\n\n${failures.slice(0, 8).join("\n")}` : "") +
+          (failures.length > 8 ? `\n... và ${failures.length - 8} lỗi khác.` : "")
+      );
     } catch (err: any) {
       alert(err.message || "Không đọc được file");
     } finally {
@@ -291,6 +388,9 @@ export default function AdminProducts() {
           >
             Sản Phẩm
           </h1>
+          <p className="mt-2 max-w-2xl text-xs opacity-60" style={{ fontFamily: "var(--font-body)" }}>
+            Nhập .xlsx, .xls hoặc .csv. Cột bắt buộc: name, price, category (tên danh mục); cột tùy chọn: brand (tên thương hiệu), stock, description, ingredients, image, originalPrice, isNewArrival, isBestseller. Dùng true/false, có/không hoặc 1/0 cho hai cột cuối.
+          </p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <label
@@ -390,6 +490,44 @@ export default function AdminProducts() {
 
       {!loading && !error && (
         <>
+          {lowStockCount > 0 && (
+            <section
+              aria-live="polite"
+              className="mb-4 flex flex-wrap items-center justify-between gap-3 border-l-4 p-4"
+              style={{
+                background: "rgba(192,57,43,0.12)",
+                borderColor: "#dc2626",
+                color: "var(--color-charcoal)",
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <span
+                  aria-hidden="true"
+                  className="flex h-10 w-10 items-center justify-center rounded-full text-xl font-bold"
+                  style={{ background: "#dc2626", color: "white" }}
+                >
+                  !
+                </span>
+                <div>
+                  <p className="text-sm font-semibold" style={{ fontFamily: "var(--font-body)" }}>
+                    {lowStockCount} sản phẩm sắp hết hàng
+                  </p>
+                  <p className="text-xs opacity-75" style={{ fontFamily: "var(--font-body)" }}>
+                    Tồn kho dưới 10 sản phẩm — kiểm tra để kịp bổ sung.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                aria-pressed={lowStockOnly}
+                onClick={() => setLowStockOnly((current) => !current)}
+                className="border px-3 py-2 text-xs font-semibold transition-colors"
+                style={{ borderColor: "#dc2626", color: "#b42318", background: "white" }}
+              >
+                {lowStockOnly ? "Hiện tất cả sản phẩm" : "Xem sản phẩm sắp hết"}
+              </button>
+            </section>
+          )}
           <div
             style={{
               background: "white",
@@ -422,6 +560,12 @@ export default function AdminProducts() {
                       key={p.id}
                       style={{
                         borderBottom: "1px solid var(--color-champagne)",
+                        ...(isLow
+                          ? {
+                              background: "rgba(220,38,38,0.07)",
+                              boxShadow: "inset 4px 0 #dc2626",
+                            }
+                          : {}),
                       }}
                       className="hover:bg-[var(--color-mist)]"
                     >
@@ -481,16 +625,27 @@ export default function AdminProducts() {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <span
-                          style={{
-                            color: isLow ? "#c0392b" : "#5a8a6a",
-                            fontFamily: "var(--font-body)",
-                          }}
-                          className="text-sm font-medium"
-                        >
-                          {isLow && "⚠ "}
-                          {p.stock}
-                        </span>
+                        <div className="flex flex-col items-start gap-1">
+                          <span
+                            style={{
+                              color: isLow ? "white" : "#5a8a6a",
+                              background: isLow ? "#dc2626" : "transparent",
+                              fontFamily: "var(--font-body)",
+                              fontWeight: 700,
+                            }}
+                            className={`text-sm ${isLow ? "rounded px-2 py-1" : ""}`}
+                          >
+                            {p.stock} sản phẩm
+                          </span>
+                          {isLow && (
+                            <span
+                              className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+                              style={{ background: "#dc2626", color: "white" }}
+                            >
+                              ⚠ Sắp hết
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex gap-2">

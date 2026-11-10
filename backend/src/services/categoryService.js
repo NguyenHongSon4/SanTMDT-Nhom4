@@ -31,7 +31,7 @@ const getCategoryById = async (id) => {
 };
 
 // Tạo danh mục mới
-const createCategory = async ({ name, description }) => {
+const createCategory = async ({ name, description, icon }) => {
   const existing = await Category.findOne({ name });
   if (existing) {
     const error = new Error("Tên danh mục đã tồn tại");
@@ -42,13 +42,14 @@ const createCategory = async ({ name, description }) => {
   const category = await Category.create({
     name,
     description: description || "",
+    icon: icon || "🌿",
   });
 
   return category;
 };
 
 // Cập nhật danh mục
-const updateCategory = async (id, { name, description, isActive }) => {
+const updateCategory = async (id, { name, description, isActive, icon }) => {
   const category = await Category.findById(id);
   if (!category) {
     const error = new Error("Không tìm thấy danh mục");
@@ -69,6 +70,7 @@ const updateCategory = async (id, { name, description, isActive }) => {
 
   if (description !== undefined) category.description = description;
   if (isActive !== undefined) category.isActive = isActive;
+  if (icon !== undefined) category.icon = icon;
 
   await category.save();
   return category;

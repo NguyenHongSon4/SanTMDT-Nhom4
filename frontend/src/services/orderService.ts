@@ -67,6 +67,11 @@ export async function createOrder(payload: CreateOrderPayload) {
   return { ...res.data, paymentUrl: res.paymentUrl, transferInstructions: res.transferInstructions };
 }
 
+export async function isCardPaymentEnabled(): Promise<boolean> {
+  const res = await apiRequest<{ success: boolean; enabled: boolean }>("/orders/payment/vnpay/status");
+  return res.enabled;
+}
+
 // Lịch sử đơn của tôi
 export async function getMyOrders() {
   const res = await apiRequest<MyOrdersResponse>("/orders/my");

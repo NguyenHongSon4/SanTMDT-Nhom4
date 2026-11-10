@@ -13,6 +13,12 @@ const categorySchema = new mongoose.Schema(
       default: "",
       trim: true,
     },
+    icon: {
+      type: String,
+      default: "🌿",
+      trim: true,
+      maxlength: 32,
+    },
     isActive: {
       type: Boolean,
       default: true,

@@ -5,6 +5,7 @@ const revenueController = require("../controllers/revenueController");
 const { protect, admin } = require("../middlewares/authMiddleware");
 
 // Customer
+router.get("/payment/vnpay/status", orderController.getVnpayAvailability);
 router.get("/payment/vnpay/ipn", orderController.handleVnpayIpn);
 router.get("/payment/vnpay/return", orderController.handleVnpayReturn);
 router.post("/", protect, orderController.createOrder);
