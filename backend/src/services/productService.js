@@ -1,4 +1,20 @@
 const Product = require("../models/Product");
+const Order = require("../models/Order");
+
+const attachSoldCounts = async (products) => {
+  if (!products.length) return products;
+  const counts = await Order.aggregate([
+    { $match: { status: "completed" } },
+    { $unwind: "$items" },
+    { $match: { "items.productId": { $in: products.map((product) => product._id) } } },
+    { $group: { _id: "$items.productId", soldCount: { $sum: "$items.quantity" } } },
+  ]);
+  const soldByProduct = new Map(counts.map(({ _id, soldCount }) => [String(_id), soldCount]));
+  return products.map((product) => ({
+    ...product.toObject(),
+    soldCount: soldByProduct.get(String(product._id)) || 0,
+  }));
+};
 
 const getAllProducts = async (query = {}) => {
   const filter = {};
@@ -44,7 +60,7 @@ const getAllProducts = async (query = {}) => {
     .populate("brandId", "name")
     .sort(sort);
 
-  return products;
+  return attachSoldCounts(products);
 };
 
 const getProductById = async (id) => {
@@ -57,7 +73,7 @@ const getProductById = async (id) => {
     error.statusCode = 404;
     throw error;
   }
-  return product;
+  return (await attachSoldCounts([product]))[0];
 };
 
 const createProduct = async (data) => {

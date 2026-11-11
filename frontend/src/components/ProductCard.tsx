@@ -75,6 +75,9 @@ export default function ProductCard({ product, navigate }: ProductCardProps) {
             </span>
           )}
         </div>
+        <p style={{ color: "var(--color-warm-gray)", fontFamily: "var(--font-body)" }} className="text-xs mt-1">
+          Đã bán {(product.soldCount ?? 0).toLocaleString("vi-VN")}
+        </p>
         {/* Stars */}
         <div className="flex items-center gap-1 mt-1">
           {Array.from({ length: 5 }).map((_, i) => (

@@ -168,6 +168,7 @@ export default function LoginPage({ navigate, onLogin }: LoginPageProps) {
         {clientId && <div className="mb-5">
           <div ref={googleButton} className="flex justify-center" />
           {googleError && <p className="mt-2 text-center text-sm" style={{ color: "#c0392b" }}>{googleError}</p>}
+          {tab === "register" && <p className="mt-2 text-center text-xs" style={{ color: "var(--color-warm-gray)" }}>Tài khoản sẽ được tạo tự động nếu bạn chưa đăng ký.</p>}
           <div className="flex items-center gap-3 my-5 text-xs" style={{ color: "var(--color-warm-gray)" }}><span className="h-px flex-1" style={{ background: "var(--color-champagne)" }} />HOẶC<span className="h-px flex-1" style={{ background: "var(--color-champagne)" }} /></div>
         </div>}
 

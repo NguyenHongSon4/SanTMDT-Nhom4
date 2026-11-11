@@ -33,7 +33,7 @@ const getById = async (req, res) => {
 
 const create = async (req, res) => {
   try {
-    const { name, description, logo } = req.body;
+    const { name, description, logo, isActive } = req.body;
 
     if (!name) {
       return res.status(400).json({
@@ -42,7 +42,7 @@ const create = async (req, res) => {
       });
     }
 
-    const brand = await brandService.createBrand({ name, description, logo });
+    const brand = await brandService.createBrand({ name, description, logo, isActive });
 
     res.status(201).json({
       success: true,

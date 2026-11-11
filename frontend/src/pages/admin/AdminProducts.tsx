@@ -455,20 +455,31 @@ export default function AdminProducts() {
           background: "white",
           border: "1px solid var(--color-champagne)",
         }}
-        className="p-4 mb-5 flex flex-col sm:flex-row gap-3"
+        className="mb-3 p-4"
       >
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Tìm theo tên hoặc thương hiệu..."
+          aria-label="Tìm sản phẩm theo tên hoặc thương hiệu"
           style={inputStyle}
-          className={inputCls + " flex-1"}
+          className={inputCls + " w-full"}
         />
+      </div>
+
+      <div
+        style={{
+          background: "white",
+          border: "1px solid var(--color-champagne)",
+        }}
+        className="p-4 mb-5"
+      >
         <select
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value)}
-          style={{ ...inputStyle, minWidth: "160px" }}
-          className={inputCls}
+          aria-label="Lọc sản phẩm theo danh mục"
+          style={inputStyle}
+          className={inputCls + " w-full"}
         >
           <option value="all">Tất cả danh mục</option>
           {categories.map((c) => (

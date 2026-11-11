@@ -18,6 +18,7 @@ interface ApiProduct {
   tags?: string[];
   rating?: number;
   reviewsCount?: number;
+  soldCount?: number;
 }
 
 interface ProductsResponse {
@@ -54,6 +55,7 @@ function mapProduct(p: ApiProduct): Product {
     tags: p.tags || [],
     rating: Number(p.rating) || 0,
     reviews: Number(p.reviewsCount) || 0,
+    soldCount: Number(p.soldCount) || 0,
     description: p.description || "",
     ingredients: p.ingredients || "",
     isNew: p.isNewArrival,

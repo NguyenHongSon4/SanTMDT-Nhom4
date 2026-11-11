@@ -33,6 +33,7 @@ export default function AdminBrands() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -134,6 +135,118 @@ export default function AdminBrands() {
     }
   };
 
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    const extension = file.name.toLowerCase().split(".").pop();
+    if (!extension || !["xlsx", "xls", "csv"].includes(extension)) {
+      alert("Vui lòng chọn file .xlsx, .xls hoặc .csv.");
+      return;
+    }
+
+    setImporting(true);
+    try {
+      const XLSX = await import("xlsx");
+      const workbook = XLSX.read(await file.arrayBuffer(), { type: "array" });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = sheet
+        ? (XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+            header: 1,
+            defval: "",
+            raw: false,
+          }) as unknown[][])
+        : [];
+      if (rows.length < 2) {
+        alert("File trống hoặc thiếu dữ liệu thương hiệu.");
+        return;
+      }
+
+      const normalize = (value: unknown) =>
+        String(value ?? "")
+          .trim()
+          .toLocaleLowerCase("vi-VN")
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/đ/g, "d")
+          .replace(/[^a-z0-9]/g, "");
+      const headers = rows[0].map(normalize);
+      const col = (...names: string[]) =>
+        headers.findIndex((header) => names.includes(header));
+      const nameCol = col("name", "brand", "brandname", "ten", "thuonghieu", "tenthuonghieu");
+      const descriptionCol = col("description", "mota");
+      const logoCol = col("logo", "logourl", "urlogo");
+      const activeCol = col("isactive", "active", "trangthai", "hoatdong");
+      if (nameCol < 0) {
+        alert("File cần có cột name (tên thương hiệu).");
+        return;
+      }
+
+      const valueAt = (row: unknown[], index: number) =>
+        index < 0 ? "" : String(row[index] ?? "").trim();
+      const activeValue = (value: string): boolean | undefined => {
+        const normalized = normalize(value);
+        if (!normalized) return true;
+        if (["true", "1", "yes", "y", "co", "x", "active", "hoatdong"].includes(normalized)) return true;
+        if (["false", "0", "no", "n", "khong", "inactive", "tat"].includes(normalized)) return false;
+        return undefined;
+      };
+      const knownNames = new Set(brands.map((brand) => normalize(brand.name)));
+      const failures: string[] = [];
+      let created = 0;
+      let skipped = 0;
+
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row.some((value) => String(value ?? "").trim())) continue;
+        const name = valueAt(row, nameCol);
+        if (!name) {
+          skipped++;
+          failures.push(`Dòng ${i + 1}: thiếu tên thương hiệu.`);
+          continue;
+        }
+        const normalizedName = normalize(name);
+        if (knownNames.has(normalizedName)) {
+          skipped++;
+          failures.push(`Dòng ${i + 1}: thương hiệu “${name}” đã tồn tại.`);
+          continue;
+        }
+        const isActive = activeValue(valueAt(row, activeCol));
+        if (isActive === undefined) {
+          skipped++;
+          failures.push(`Dòng ${i + 1}: trạng thái hoạt động không hợp lệ.`);
+          continue;
+        }
+
+        try {
+          await createBrand({
+            name,
+            description: valueAt(row, descriptionCol),
+            logo: valueAt(row, logoCol),
+            isActive,
+          });
+          knownNames.add(normalizedName);
+          created++;
+        } catch (err: any) {
+          skipped++;
+          failures.push(`Dòng ${i + 1}: ${err.message || "không tạo được thương hiệu."}`);
+        }
+      }
+
+      await load();
+      alert(
+        `Nhập xong: ${created} thương hiệu được tạo, ${skipped} dòng bỏ qua.` +
+          (failures.length ? `\n\n${failures.slice(0, 8).join("\n")}` : "") +
+          (failures.length > 8 ? `\n... và ${failures.length - 8} dòng khác.` : "")
+      );
+    } catch (err: any) {
+      alert(err.message || "Không đọc được file thương hiệu.");
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const inputStyle = {
     fontFamily: "var(--font-body)",
     border: "1px solid var(--color-champagne)",
@@ -166,19 +279,38 @@ export default function AdminBrands() {
             Thương Hiệu
           </h1>
         </div>
-        <button
-          type="button"
-          onClick={openNew}
-          style={{
-            background: "var(--color-charcoal)",
-            color: "var(--color-champagne)",
-            fontFamily: "var(--font-body)",
-          }}
-          className="px-5 py-2.5 text-xs tracking-widest uppercase hover:opacity-80"
-        >
-          + Thêm Thương Hiệu
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <label
+            className={`cursor-pointer border px-4 py-2.5 text-xs tracking-widest uppercase hover:bg-[var(--color-mist)] ${importing ? "pointer-events-none opacity-50" : ""}`}
+            style={{ borderColor: "var(--color-champagne)", fontFamily: "var(--font-body)" }}
+          >
+            {importing ? "Đang nhập..." : "Nhập Excel/CSV"}
+            <input
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              className="hidden"
+              disabled={importing}
+              onChange={handleImport}
+            />
+          </label>
+          <button
+            type="button"
+            onClick={openNew}
+            style={{
+              background: "var(--color-charcoal)",
+              color: "var(--color-champagne)",
+              fontFamily: "var(--font-body)",
+            }}
+            className="px-5 py-2.5 text-xs tracking-widest uppercase hover:opacity-80"
+          >
+            + Thêm Thương Hiệu
+          </button>
+        </div>
       </div>
+
+      <p className="-mt-3 mb-5 text-xs opacity-60" style={{ fontFamily: "var(--font-body)" }}>
+        File cần cột name (tên thương hiệu); có thể thêm description, logo và isActive. Tên trùng sẽ được bỏ qua.
+      </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         {[
@@ -220,20 +352,21 @@ export default function AdminBrands() {
           background: "white",
           border: "1px solid var(--color-champagne)",
         }}
-        className="p-4 mb-5 flex flex-col sm:flex-row gap-3"
+        className="p-4 mb-5 flex flex-col gap-3"
       >
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Tìm theo tên hoặc mô tả..."
+          placeholder={"T\u00ecm th\u01b0\u01a1ng hi\u1ec7u theo t\u00ean..."}
+          aria-label="Tìm thương hiệu theo tên"
           style={inputStyle}
-          className={inputClass + " flex-1"}
+          className={inputClass + " w-full"}
         />
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
           style={{ ...inputStyle, minWidth: "160px" }}
-          className={inputClass}
+          className={inputClass + " w-full sm:w-64"}
         >
           <option value="all">Tất cả trạng thái</option>
           <option value="active">Đang hoạt động</option>

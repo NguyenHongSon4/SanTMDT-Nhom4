@@ -49,6 +49,7 @@ export async function createBrand(payload: {
   name: string;
   description?: string;
   logo?: string;
+  isActive?: boolean;
 }) {
   const res = await apiRequest<{ success: boolean; data: ApiBrand }>("/brands", {
     method: "POST",

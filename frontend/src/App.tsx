@@ -79,6 +79,7 @@ export interface Product {
   tags: string[];
   rating: number;
   reviews: number;
+  soldCount?: number;
   description: string;
   ingredients: string;
   isNew?: boolean;

@@ -78,6 +78,10 @@ export default function ProductDetailPage({ product, navigate, addToCart, user, 
               {product.name}
             </h1>
 
+            <p style={{ color: "var(--color-warm-gray)", fontFamily: "var(--font-body)" }} className="text-sm mb-4">
+              Đã bán {(product.soldCount ?? 0).toLocaleString("vi-VN")}
+            </p>
+
             {/* Rating */}
             <div className="flex items-center gap-2 mb-6">
               <div className="flex gap-1">

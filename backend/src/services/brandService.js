@@ -26,7 +26,7 @@ const getBrandById = async (id) => {
   return brand;
 };
 
-const createBrand = async ({ name, description, logo }) => {
+const createBrand = async ({ name, description, logo, isActive }) => {
   const existing = await Brand.findOne({ name });
   if (existing) {
     const error = new Error("Tên thương hiệu đã tồn tại");
@@ -38,6 +38,7 @@ const createBrand = async ({ name, description, logo }) => {
     name,
     description: description || "",
     logo: logo || "",
+    isActive: isActive === undefined ? true : isActive,
   });
 
   return brand;
