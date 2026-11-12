@@ -183,6 +183,24 @@ const completeCancellation = async (req, res) => {
   }
 };
 
+const requestReturn = async (req, res) => {
+  try {
+    const order = await orderService.requestReturn(req.user._id, req.params.id, req.body?.reason);
+    return res.status(200).json({ success: true, message: "Đã gửi yêu cầu trả hàng/hoàn tiền", data: order });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({ success: false, message: error.message || "Lỗi server" });
+  }
+};
+
+const processReturn = async (req, res) => {
+  try {
+    const order = await orderService.processReturn(req.params.id, req.params.decision);
+    return res.status(200).json({ success: true, message: "Đã xử lý yêu cầu trả hàng", data: order });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({ success: false, message: error.message || "Lỗi server" });
+  }
+};
+
 // GET /api/orders  (Admin)
 const getAllOrders = async (req, res) => {
   try {
@@ -265,4 +283,6 @@ module.exports = {
   handleVnpayReturn,
   updatePaymentStatus,
   completeCancellation,
+  requestReturn,
+  processReturn,
 };

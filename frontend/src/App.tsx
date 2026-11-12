@@ -142,9 +142,11 @@ export interface Order {
   cancellationStatus?: "none" | "requested" | "completed";
   cancellationReason?: string;
   cancellationReasonDetail?: string;
+  returnStatus?: "none" | "requested" | "approved" | "rejected";
+  returnReason?: string;
   note?: string;
   createdAt: string;
-  status: "pending" | "confirmed" | "shipping" | "completed" | "cancelled";
+  status: "pending" | "confirmed" | "shipping" | "completed" | "returned" | "cancelled";
 }
 
 export default function App() {

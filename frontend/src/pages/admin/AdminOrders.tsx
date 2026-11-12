@@ -5,6 +5,7 @@ import {
   updateOrderStatus,
   updatePaymentStatus,
   completeOrderCancellation,
+  processOrderReturn,
   type AdminOrderFromApi,
 } from "../../services/orderService";
 
@@ -47,6 +48,8 @@ interface AdminOrderView {
   cancellationStatus: "none" | "requested" | "completed";
   cancellationReason?: string;
   cancellationReasonDetail?: string;
+  returnStatus: "none" | "requested" | "approved" | "rejected";
+  returnReason?: string;
   status: OrderStatus;
   createdAt: string;
   subtotal: number;
@@ -80,6 +83,8 @@ function mapOrder(o: AdminOrderFromApi): AdminOrderView {
     cancellationStatus: o.cancellationStatus || (o.status === "cancelled" ? "completed" : "none"),
     cancellationReason: o.cancellationReason,
     cancellationReasonDetail: o.cancellationReasonDetail,
+    returnStatus: o.returnStatus || "none",
+    returnReason: o.returnReason,
     status: o.status,
     createdAt: o.createdAt ? o.createdAt.slice(0, 10) : "",
     subtotal: o.subtotal,
@@ -105,8 +110,8 @@ export default function AdminOrders() {
   const [selectedOrder, setSelectedOrder] = useState<AdminOrderView | null>(null);
   const [updating, setUpdating] = useState(false);
 
-  const loadOrders = async () => {
-    setLoading(true);
+  const loadOrders = async (silent = false) => {
+    if (!silent) setLoading(true);
     setError("");
     try {
       const data = await getAllOrders();
@@ -115,12 +120,17 @@ export default function AdminOrders() {
       setError(err.message || "Không tải được đơn hàng (cần đăng nhập Admin)");
       setOrders([]);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => {
     loadOrders();
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => { void loadOrders(true); }, 15000);
+    return () => window.clearInterval(timer);
   }, []);
 
   const filtered = orders.filter((o) => {
@@ -131,11 +141,26 @@ export default function AdminOrders() {
       o.userName.toLowerCase().includes(q) ||
       o.phone.includes(search);
     const matchStatus = statusFilter === "all"
-      || (statusFilter === "cancellation" ? o.cancellationStatus === "requested" : o.status === statusFilter);
+      || (statusFilter === "cancellation" ? o.cancellationStatus === "requested" : statusFilter === "returns" ? o.returnStatus === "requested" : o.status === statusFilter);
     return matchSearch && matchStatus;
-  }).sort((a, b) => Number(b.cancellationStatus === "requested") - Number(a.cancellationStatus === "requested"));
+  }).sort((a, b) => Number(b.cancellationStatus === "requested" || b.returnStatus === "requested") - Number(a.cancellationStatus === "requested" || a.returnStatus === "requested"));
 
   const cancellationQueueCount = orders.filter((order) => order.cancellationStatus === "requested").length;
+  const returnQueueCount = orders.filter((order) => order.returnStatus === "requested").length;
+
+  const handleReturn = async (order: AdminOrderView, decision: "approved" | "rejected") => {
+    const prompt = decision === "approved"
+      ? (order.paymentStatus === "paid" ? "Xác nhận đã nhận hàng trả lại và hoàn tiền cho khách?" : "Duyệt yêu cầu trả hàng này?")
+      : "Từ chối yêu cầu trả hàng/hoàn tiền này?";
+    if (!window.confirm(prompt)) return;
+    setUpdating(true);
+    try {
+      const mapped = mapOrder(await processOrderReturn(order.mongoId, decision));
+      setOrders((prev) => prev.map((item) => item.mongoId === order.mongoId ? mapped : item));
+      setSelectedOrder(mapped);
+    } catch (err: any) { alert(err.message || "Không xử lý được yêu cầu trả hàng"); }
+    finally { setUpdating(false); }
+  };
 
   const handleUpdateStatus = async (mongoId: string, status: OrderStatus) => {
     setUpdating(true);
@@ -211,7 +236,7 @@ export default function AdminOrders() {
         {[
           { key: "all", label: "Tổng", count: orders.length },
           { key: "cancellation", label: "Cần Xử Lý", count: cancellationQueueCount },
-          ...(["pending", "confirmed", "shipping", "completed"] as const).map(
+          ...(["pending", "confirmed", "shipping", "completed", "returned"] as const).map(
             (s) => ({
               key: s,
               label: statusLabel[s],
@@ -278,6 +303,16 @@ export default function AdminOrders() {
         </div>
       )}
 
+      <div className="mb-5 flex flex-col gap-3 border-l-4 p-4 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "#7b6ca0", background: "#f5f1fa" }}>
+        <div>
+          <p className="text-sm font-semibold" style={{ color: "#594a78", fontFamily: "var(--font-body)" }}>Yêu cầu trả hàng / hoàn tiền: {returnQueueCount} cần xử lý</p>
+          <p className="mt-1 text-xs" style={{ color: "var(--color-warm-gray)", fontFamily: "var(--font-body)" }}>Mở danh sách để xem lý do và duyệt hoặc từ chối từng yêu cầu.</p>
+        </div>
+        <button type="button" onClick={() => setStatusFilter("returns")} className="shrink-0 px-4 py-2 text-xs font-medium uppercase tracking-widest" style={{ background: "#594a78", color: "white", fontFamily: "var(--font-body)" }}>
+          Xem yêu cầu ({returnQueueCount})
+        </button>
+      </div>
+
       {/* Search */}
       <div
         style={{ background: "white", border: "1px solid var(--color-champagne)" }}
@@ -334,12 +369,12 @@ export default function AdminOrders() {
                   key={order.mongoId}
                   style={{
                     borderBottom: "1px solid var(--color-champagne)",
-                    background: order.cancellationStatus === "requested" ? "#fff8f3" : undefined,
-                    boxShadow: order.cancellationStatus === "requested" ? "inset 4px 0 #c0392b" : undefined,
+                    background: order.cancellationStatus === "requested" || order.returnStatus === "requested" ? "#fff8f3" : undefined,
+                    boxShadow: order.cancellationStatus === "requested" || order.returnStatus === "requested" ? "inset 4px 0 #c0392b" : undefined,
                   }}
                   className="hover:bg-[var(--color-mist)] transition-colors"
                 >
-                  <td className="px-4 py-3" style={{ borderLeft: order.cancellationStatus === "requested" ? "4px solid #c0392b" : undefined }}>
+                  <td className="px-4 py-3" style={{ borderLeft: order.cancellationStatus === "requested" || order.returnStatus === "requested" ? "4px solid #c0392b" : undefined }}>
                     <p
                       style={{
                         fontFamily: "var(--font-body)",
@@ -349,9 +384,9 @@ export default function AdminOrders() {
                     >
                       {order.id}
                     </p>
-                    {order.cancellationStatus === "requested" && (
+                    {(order.cancellationStatus === "requested" || order.returnStatus === "requested") && (
                       <span className="mt-1 inline-flex items-center gap-1 border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide" style={{ color: "#a12f24", borderColor: "#e6a59c", background: "#fff0ec", fontFamily: "var(--font-body)" }}>
-                        <span aria-hidden="true">●</span> Cần xử lý hủy/hoàn tiền
+                        <span aria-hidden="true">●</span> {order.returnStatus === "requested" ? "Cần xử lý trả hàng" : "Cần xử lý hủy/hoàn tiền"}
                       </span>
                     )}
                   </td>
@@ -400,16 +435,16 @@ export default function AdminOrders() {
                   <td className="px-4 py-3">
                     <span
                       style={{
-                        color: statusColor[order.status],
-                        background: statusColor[order.status] + "18",
-                        border: `1px solid ${statusColor[order.status]}40`,
+                        color: statusColor[order.status] || "#7b6ca0",
+                        background: (statusColor[order.status] || "#7b6ca0") + "18",
+                        border: `1px solid ${(statusColor[order.status] || "#7b6ca0")}40`,
                         fontFamily: "var(--font-body)",
                       }}
                       className="text-xs px-2 py-1 tracking-widest uppercase"
                     >
-                      {statusLabel[order.status]}
+                      {order.status === "returned" ? "Đã trả hàng / hoàn tiền" : statusLabel[order.status]}
                     </span>
-                    {order.cancellationStatus === "requested" && (
+                    {(order.cancellationStatus === "requested" || order.returnStatus === "requested") && (
                       <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide" style={{ color: "#a12f24", fontFamily: "var(--font-body)" }}>
                         Đang chờ xử lý
                       </p>
@@ -429,7 +464,7 @@ export default function AdminOrders() {
                   <td className="px-4 py-3">
                     <button
                       onClick={() => setSelectedOrder(order)}
-                      style={order.cancellationStatus === "requested" ? {
+                      style={order.cancellationStatus === "requested" || order.returnStatus === "requested" ? {
                         color: "white", background: "#c0392b", fontFamily: "var(--font-body)", border: "1px solid #c0392b",
                       } : {
                         color: "var(--color-warm-gray)", fontFamily: "var(--font-body)", border: "1px solid var(--color-champagne)",
@@ -644,6 +679,20 @@ export default function AdminOrders() {
               )}
             </div>
 
+            {selectedOrder.returnStatus === "requested" && (
+              <div className="mb-5 border p-4" style={{ borderColor: "#d8bd91", background: "#d8bd9118" }}>
+                <p className="mb-2 text-xs font-medium uppercase tracking-widest">Yêu cầu trả hàng / hoàn tiền</p>
+                <p className="mb-3 whitespace-pre-wrap text-sm">Lý do: {selectedOrder.returnReason || "—"}</p>
+                <p className="mb-3 text-xs">Duyệt yêu cầu sẽ ghi nhận hoàn tiền trong hệ thống. Hãy xác nhận đã nhận hàng trả lại và thực hiện hoàn tiền qua phương thức thanh toán ban đầu.</p>
+                <div className="flex gap-2">
+                  <button disabled={updating} onClick={() => handleReturn(selectedOrder, "approved")} className="px-4 py-2 text-xs disabled:opacity-50" style={{ background: "var(--color-charcoal)", color: "var(--color-champagne)" }}>Duyệt & xác nhận hoàn tiền</button>
+                  <button disabled={updating} onClick={() => handleReturn(selectedOrder, "rejected")} className="border px-4 py-2 text-xs disabled:opacity-50" style={{ borderColor: "#c0392b", color: "#c0392b" }}>Từ chối</button>
+                </div>
+              </div>
+            )}
+            {selectedOrder.returnStatus === "approved" && <p className="mb-4 border p-3 text-sm" style={{ borderColor: "rgba(90,138,106,0.4)", color: "#456b50" }}>Đã duyệt trả hàng/hoàn tiền{selectedOrder.paymentStatus === "refunded" ? " · Đã ghi nhận hoàn tiền" : ""}.</p>}
+            {selectedOrder.returnStatus === "rejected" && <p className="mb-4 border p-3 text-sm" style={{ borderColor: "#e6a59c", color: "#a12f24" }}>Yêu cầu trả hàng/hoàn tiền đã bị từ chối.</p>}
+
             {selectedOrder.cancellationStatus === "requested" && (
               <div className="mb-5 border p-4" style={{ borderColor: "#d8bd91", background: "#d8bd9118" }}>
                 <p className="text-xs tracking-widest uppercase font-medium mb-2">Khách yêu cầu hủy đơn</p>
@@ -668,7 +717,7 @@ export default function AdminOrders() {
               </div>
             )}
 
-            {selectedOrder.status !== "cancelled" && selectedOrder.cancellationStatus !== "requested" && (
+            {selectedOrder.status !== "cancelled" && selectedOrder.status !== "returned" && selectedOrder.cancellationStatus !== "requested" && (
               <div>
                 <p
                   style={{

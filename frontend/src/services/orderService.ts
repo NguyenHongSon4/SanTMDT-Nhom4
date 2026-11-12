@@ -34,11 +34,14 @@ export interface OrderFromApi {
   cancellationStatus?: "none" | "requested" | "completed";
   cancellationReason?: string;
   cancellationReasonDetail?: string;
+  returnStatus?: "none" | "requested" | "approved" | "rejected";
+  returnReason?: string;
+  returnRequestedAt?: string;
   subtotal: number;
   shippingFee: number;
   discount: number;
   total: number;
-  status: "pending" | "confirmed" | "shipping" | "completed" | "cancelled";
+  status: "pending" | "confirmed" | "shipping" | "completed" | "returned" | "cancelled";
   createdAt: string;
 }
 
@@ -83,6 +86,13 @@ export async function cancelMyOrder(orderId: string, reason: string, reasonDetai
   const res = await apiRequest<{ success: boolean; message: string; data: OrderFromApi }>(
     `/orders/my/${orderId}/cancel`,
     { method: "PUT", body: JSON.stringify({ reason, reasonDetail }) }
+  );
+  return res.data;
+}
+
+export async function requestMyReturn(orderId: string, reason: string) {
+  const res = await apiRequest<{ success: boolean; message: string; data: OrderFromApi }>(
+    `/orders/my/${orderId}/return`, { method: "POST", body: JSON.stringify({ reason }) }
   );
   return res.data;
 }
@@ -134,6 +144,13 @@ export async function completeOrderCancellation(orderId: string) {
   const res = await apiRequest<{ success: boolean; message: string; data: AdminOrderFromApi }>(
     `/orders/${orderId}/cancellation/complete`,
     { method: "PUT" }
+  );
+  return res.data;
+}
+
+export async function processOrderReturn(orderId: string, decision: "approved" | "rejected") {
+  const res = await apiRequest<{ success: boolean; message: string; data: AdminOrderFromApi }>(
+    `/orders/${orderId}/return/${decision}`, { method: "PUT" }
   );
   return res.data;
 }

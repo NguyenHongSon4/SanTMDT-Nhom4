@@ -242,6 +242,53 @@ const completeCancellation = async (orderId) => {
   return updatedOrder;
 };
 
+const requestReturn = async (userId, orderId, reason) => {
+  const order = await Order.findOne({ _id: orderId, userId });
+  if (!order) { const error = new Error("Không tìm thấy đơn hàng"); error.statusCode = 404; throw error; }
+  if (order.status !== "completed" || !["none", "rejected"].includes(order.returnStatus || "none")) {
+    const error = new Error("Đơn hàng hiện không thể gửi yêu cầu trả hàng mới"); error.statusCode = 400; throw error;
+  }
+  const detail = String(reason || "").trim();
+  if (!detail) { const error = new Error("Vui lòng nhập lý do trả hàng/hoàn tiền"); error.statusCode = 400; throw error; }
+  const deadline = new Date(order.completedAt || order.updatedAt);
+  deadline.setDate(deadline.getDate() + 7);
+  if (new Date() > deadline) { const error = new Error("Đã quá thời hạn yêu cầu trả hàng 7 ngày"); error.statusCode = 400; throw error; }
+  const updatedOrder = await Order.findOneAndUpdate(
+    {
+      _id: order._id,
+      userId,
+      status: "completed",
+      $or: [
+        { returnStatus: "none" },
+        { returnStatus: "rejected" },
+        { returnStatus: { $exists: false } },
+      ],
+    },
+    { $set: { returnStatus: "requested", returnReason: detail.slice(0, 500), returnRequestedAt: new Date() } },
+    { new: true, runValidators: true },
+  );
+  if (!updatedOrder) {
+    const error = new Error("Yêu cầu chưa được lưu. Vui lòng tải lại đơn hàng và thử lại.");
+    error.statusCode = 409;
+    throw error;
+  }
+  return updatedOrder;
+};
+
+const processReturn = async (orderId, decision) => {
+  if (!["approved", "rejected"].includes(decision)) { const error = new Error("Quyết định không hợp lệ"); error.statusCode = 400; throw error; }
+  const filter = { _id: orderId, status: "completed", returnStatus: "requested" };
+  const update = {
+    returnStatus: decision,
+    returnProcessedAt: new Date(),
+    ...(decision === "approved" ? { status: "returned" } : {}),
+  };
+  if (decision === "approved" && ["paid", "pending"].includes((await Order.findById(orderId))?.paymentStatus)) update.paymentStatus = "refunded";
+  const order = await Order.findOneAndUpdate(filter, { $set: update }, { new: true, runValidators: true });
+  if (!order) { const error = new Error("Không tìm thấy yêu cầu trả hàng đang chờ xử lý"); error.statusCode = 404; throw error; }
+  return order;
+};
+
 // Admin xem tất cả đơn
 const getAllOrders = async (query = {}) => {
   const filter = {};
@@ -396,4 +443,6 @@ module.exports = {
   updateOrderStatus,
   updatePaymentStatus,
   completeCancellation,
+  requestReturn,
+  processReturn,
 };

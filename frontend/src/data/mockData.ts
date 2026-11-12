@@ -237,3 +237,6 @@ export const statusColor: Record<string, string> = {
   completed: "#5a8a6a",
   cancelled: "#a05a5a",
 };
+
+statusLabel.returned = "Đã trả hàng / hoàn tiền";
+statusColor.returned = "#7b6ca0";

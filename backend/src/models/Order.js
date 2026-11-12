@@ -91,7 +91,7 @@ const orderSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["pending", "confirmed", "shipping", "completed", "cancelled"],
+      enum: ["pending", "confirmed", "shipping", "completed", "returned", "cancelled"],
       default: "pending",
     },
     cancellationStatus: {
@@ -106,6 +106,10 @@ const orderSchema = new mongoose.Schema(
     },
     cancellationReasonDetail: { type: String, default: "", maxlength: 500 },
     cancellationRequestedAt: { type: Date, default: null },
+    returnStatus: { type: String, enum: ["none", "requested", "approved", "rejected"], default: "none", index: true },
+    returnReason: { type: String, default: "", maxlength: 500 },
+    returnRequestedAt: { type: Date, default: null },
+    returnProcessedAt: { type: Date, default: null },
     completedAt: { type: Date, default: null, index: true },
   },
   {

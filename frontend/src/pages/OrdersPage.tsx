@@ -4,6 +4,7 @@ import { statusLabel, statusColor } from "../data/mockData";
 import {
   getMyOrders,
   cancelMyOrder,
+  requestMyReturn,
   type OrderFromApi,
 } from "../services/orderService";
 import type { Product } from "../App";
@@ -41,6 +42,8 @@ function mapOrder(o: OrderFromApi): Order {
     cancellationStatus: o.cancellationStatus || (o.status === "cancelled" ? "completed" : "none"),
     cancellationReason: o.cancellationReason,
     cancellationReasonDetail: o.cancellationReasonDetail,
+    returnStatus: o.returnStatus || "none",
+    returnReason: o.returnReason,
     note: o.note,
     createdAt: o.createdAt ? o.createdAt.slice(0, 10) : "",
     status: o.status,
@@ -94,6 +97,9 @@ export default function OrdersPage({ navigate }: OrdersPageProps) {
   const [filterStatus, setFilterStatus] = useState("all");
   const [cancelling, setCancelling] = useState(false);
   const [reviewingProductId, setReviewingProductId] = useState<string | null>(null);
+  const [returnTarget, setReturnTarget] = useState<string | null>(null);
+  const [returnReason, setReturnReason] = useState("");
+  const [returning, setReturning] = useState(false);
 
   const loadOrders = async (showLoading = true) => {
     if (showLoading) setLoading(true);
@@ -184,6 +190,20 @@ export default function OrdersPage({ navigate }: OrdersPageProps) {
     } finally {
       setReviewingProductId(null);
     }
+  };
+
+  const submitReturn = async () => {
+    const mongoId = idMap[returnTarget || ""];
+    if (!mongoId || !returnReason.trim()) return;
+    setReturning(true);
+    try {
+      await requestMyReturn(mongoId, returnReason.trim());
+      setReturnTarget(null);
+      setReturnReason("");
+      setNotice({ type: "pending", text: "Yêu cầu trả hàng/hoàn tiền đã được gửi tới Admin." });
+      await loadOrders();
+    } catch (err: any) { alert(err.message || "Không gửi được yêu cầu"); }
+    finally { setReturning(false); }
   };
 
   return (
@@ -348,14 +368,14 @@ export default function OrdersPage({ navigate }: OrdersPageProps) {
                       </div>
                       <div
                         style={{
-                          background: statusColor[order.status] + "18",
-                          color: statusColor[order.status],
+                          background: (statusColor[order.status] || "#7b6ca0") + "18",
+                          color: statusColor[order.status] || "#7b6ca0",
                           fontFamily: "var(--font-body)",
-                          border: `1px solid ${statusColor[order.status]}40`,
+                          border: `1px solid ${(statusColor[order.status] || "#7b6ca0")}40`,
                         }}
                         className="px-3 py-1 text-xs tracking-widest uppercase w-fit"
                       >
-                        {statusLabel[order.status]}
+                        {order.status === "returned" ? "Đã trả hàng / hoàn tiền" : statusLabel[order.status]}
                       </div>
                       {order.cancellationStatus === "requested" && (
                         <div className="px-3 py-1 text-xs tracking-widest uppercase w-fit border" style={{ color: "#9a6b2f", borderColor: "#d8bd91", background: "#d8bd9118", fontFamily: "var(--font-body)" }}>
@@ -400,7 +420,13 @@ export default function OrdersPage({ navigate }: OrdersPageProps) {
                           {order.cancellationReason && <p className="mt-1">Lý do: {cancellationReasonLabels[order.cancellationReason] || order.cancellationReason}{order.cancellationReasonDetail ? ` — ${order.cancellationReasonDetail}` : ""}</p>}
                         </div>
                       )}
-                      {order.status !== "cancelled" && (
+                      {order.returnStatus && order.returnStatus !== "none" && (
+                        <div className="px-6 py-3 text-xs leading-relaxed" style={{ background: order.returnStatus === "requested" ? "#d8bd9118" : "rgba(90,138,106,0.08)", color: order.returnStatus === "requested" ? "#8a642f" : "#456b50", fontFamily: "var(--font-body)" }}>
+                          <p className="font-medium">{{ requested: "Yêu cầu trả hàng/hoàn tiền đang chờ Admin xử lý.", approved: "Yêu cầu đã được duyệt; đơn hàng đã chuyển sang trạng thái trả hàng/hoàn tiền.", rejected: "Yêu cầu trả hàng/hoàn tiền đã bị từ chối." }[order.returnStatus]}</p>
+                          {order.returnReason && <p className="mt-1">Lý do: {order.returnReason}</p>}
+                        </div>
+                      )}
+                      {order.status !== "cancelled" && order.status !== "returned" && (
                         <div
                           className="px-6 py-5"
                           style={{
@@ -582,6 +608,12 @@ export default function OrdersPage({ navigate }: OrdersPageProps) {
                           </p>
                         </div>
                         <div className="flex gap-2 items-end">
+                          {order.status === "completed" && (!order.returnStatus || order.returnStatus === "none" || order.returnStatus === "rejected") && (
+                            <button onClick={() => { setReturnTarget(order.id); setReturnReason(""); }} className="px-5 py-2 text-xs tracking-widest uppercase" style={{ border: "1px solid #9a6b2f", color: "#8a642f", fontFamily: "var(--font-body)" }}>
+                              Trả hàng / hoàn tiền
+                            </button>
+                          )}
+                          {order.returnStatus && order.returnStatus !== "none" && <span className="text-xs" style={{ color: order.returnStatus === "rejected" ? "#c0392b" : "#8a642f" }}>{({ requested: "Đang chờ xử lý trả hàng", approved: "Đã duyệt hoàn tiền", rejected: "Yêu cầu bị từ chối" } as Record<string, string>)[order.returnStatus]}</span>}
                           {order.status === "pending" && order.cancellationStatus !== "requested" && (
                             <button
                               onClick={() => { setCancelTarget(order.id); setCancelReason(""); setCancelReasonDetail(""); setCancelError(""); setNotice(null); }}
@@ -605,6 +637,20 @@ export default function OrdersPage({ navigate }: OrdersPageProps) {
           </div>
         )}
       </div>
+
+      {returnTarget && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 p-4" onClick={() => !returning && setReturnTarget(null)}>
+          <div className="w-full max-w-md bg-[var(--color-cream)] p-6" onClick={(event) => event.stopPropagation()}>
+            <h2 className="mb-2 text-xl" style={{ fontFamily: "var(--font-display)" }}>Yêu cầu trả hàng / hoàn tiền</h2>
+            <p className="mb-4 text-xs" style={{ color: "var(--color-warm-gray)" }}>Có thể gửi yêu cầu trong vòng 7 ngày kể từ khi đơn hoàn tất. Admin sẽ xem xét và cập nhật kết quả.</p>
+            <textarea value={returnReason} onChange={(event) => setReturnReason(event.target.value)} maxLength={500} rows={4} placeholder="Lý do trả hàng hoặc hoàn tiền" className="mb-4 w-full border bg-white p-3 text-sm" style={{ borderColor: "var(--color-champagne)" }} />
+            <div className="flex justify-end gap-2">
+              <button disabled={returning} onClick={() => setReturnTarget(null)} className="border px-4 py-2 text-xs">Đóng</button>
+              <button disabled={returning || !returnReason.trim()} onClick={submitReturn} className="px-4 py-2 text-xs disabled:opacity-50" style={{ background: "var(--color-charcoal)", color: "var(--color-champagne)" }}>{returning ? "Đang gửi..." : "Gửi yêu cầu"}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {cancelTarget && (
         <div

@@ -1,7 +1,7 @@
 const Order = require("../models/Order");
 const Product = require("../models/Product");
 
-const STATUSES = ["pending", "confirmed", "shipping", "completed", "cancelled"];
+const STATUSES = ["pending", "confirmed", "shipping", "completed", "returned", "cancelled"];
 const LOW_STOCK = 10;
 const REVENUE_MATCH = {
   status: "completed",
