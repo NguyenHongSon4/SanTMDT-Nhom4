@@ -1,3 +1,4 @@
+import Checkout from './components/Checkout/Checkout';
 import { useState } from "react";
 import HomePage from "./pages/HomePage";
 import ProductsPage from "./pages/ProductsPage";
